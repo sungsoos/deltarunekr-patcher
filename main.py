@@ -262,10 +262,10 @@ class DeltaruneKoreanPatcher(ctk.CTk):
                 self.verify_and_apply_xdelta(delta, orig)
 
             self.log("--- 언어 파일 복사 ---")
-            lang_src = resource_path('언어파일들')
+            lang_src = resource_path('lang')
             if not os.path.isdir(lang_src):
-                self.log("'언어파일들' 폴더 없음!", color=ERROR_COLOR)
-                raise FileNotFoundError("'언어파일들' 폴더 필요")
+                self.log("'lang' 폴더 없음!", color=ERROR_COLOR)
+                raise FileNotFoundError("'lang' 폴더 필요")
 
             for d in os.listdir(lang_src):
                 src = os.path.join(lang_src, d)
@@ -330,3 +330,4 @@ class DeltaruneKoreanPatcher(ctk.CTk):
 if __name__ == "__main__":
     app = DeltaruneKoreanPatcher()
     app.mainloop()
+
