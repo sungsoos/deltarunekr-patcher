@@ -2,10 +2,10 @@
 
 
 a = Analysis(
-    ['C:\\Users\\nydwc\\Desktop\\deltarunekr_patcher\\patcher.py'],
+    ['/home/sungsoos/바탕화면/git/deltarunekr_patcher/patcher.py'],
     pathex=[],
     binaries=[],
-    datas=[('C:\\Users\\nydwc\\Desktop\\deltarunekr_patcher\\orig\\src\\assets', 'assets')],
+    datas=[('/home/sungsoos/바탕화면/git/deltarunekr_patcher/assets', 'assets')],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},
@@ -35,5 +35,4 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon=['C:\\Users\\nydwc\\Desktop\\deltarunekr_patcher\\orig\\src\\assets\\icon.ico'],
 )
