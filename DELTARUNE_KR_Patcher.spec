@@ -35,24 +35,52 @@ if os.path.exists(patch_dir):
 icon_path = os.path.join(assets_dir, 'icon.ico')
 icon_arg = icon_path if os.path.exists(icon_path) else None
 
-excludes = [
-    'pygame',
-    'tkinter',
-    'matplotlib',
-    'numpy',
-    'scipy',
-    'unittest',
-    'doctest',
-    'pydoc',
-    'xmlrpc',
+# pip freeze 및 설치된 패키지의 top_level 모듈 자동 추출 후 필수 모듈 제외 전원 excludes 등록
+keep_pkgs = {
+    'pyside6', 'pyside6_essentials', 'pyside6_addons', 'shiboken6',
+    'pyxdelta', 'pyinstaller', 'pyinstaller-hooks-contrib', 'altgraph',
+}
+
+pip_excludes = set()
+try:
+    import importlib.metadata
+    for dist in importlib.metadata.distributions():
+        name = dist.metadata.get('Name')
+        if name and name.lower() not in keep_pkgs:
+            pip_excludes.add(name)
+            top_level = dist.read_text('top_level.txt')
+            if top_level:
+                for mod in top_level.splitlines():
+                    mod = mod.strip()
+                    if mod and mod.lower() not in keep_pkgs:
+                        pip_excludes.add(mod)
+except Exception:
+    pass
+
+static_excludes = [
+    # Unused Python stdlib modules
+    'tkinter', 'unittest', 'doctest', 'pydoc', 'xmlrpc', 'email', 'http',
+    'ftplib', 'smtplib', 'sqlite3', 'multiprocessing', 'asyncio', 'concurrent',
+    'xml', 'html', 'curses', 'dbm', 'gdbm', 'lzma', 'bz2', 'csv', 'ctypes.test',
+    
+    # Unused PySide6 submodules & Qt bindings
+    'PySide6.QtNetwork', 'PySide6.QtDBus', 'PySide6.QtPdf', 'PySide6.QtOpenGL',
+    'PySide6.QtSvg', 'PySide6.QtSql', 'PySide6.QtXml', 'PySide6.QtTest',
+    'PySide6.QtPrintSupport', 'PySide6.QtQml', 'PySide6.QtQuick',
+    'PySide6.QtDesigner', 'PySide6.QtHelp', 'PySide6.QtUiTools',
+    'PySide6.QtSensors', 'PySide6.QtPositioning', 'PySide6.QtWebChannel',
+    'PySide6.QtWebEngineCore', 'PySide6.QtWebSockets', 'PySide6.QtBluetooth',
+    'PySide6.QtNfc', 'PySide6.QtSpatialAudio', 'PySide6.QtMultimedia',
 ]
+
+excludes = list(pip_excludes.union(set(static_excludes)))
 
 a = Analysis(
     [os.path.join(spec_dir, 'patcher.py')],
     pathex=[],
     binaries=[],
     datas=datas,
-    hiddenimports=[],
+    hiddenimports=['winreg'],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],

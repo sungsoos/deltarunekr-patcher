@@ -1,0 +1,148 @@
+name: Build & Release
+
+on:
+  push:
+    branches: [ "main", "master" ]
+    tags: [ "v*" ]
+  pull_request:
+    branches: [ "main", "master" ]
+  workflow_dispatch:
+
+jobs:
+  build-macos:
+    name: Build macOS (.app & .zip)
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install PySide6 pyxdelta pyinstaller
+
+      - name: Ensure Executable Permissions
+        run: |
+          chmod +x assets/bin/xdelta3_mac || true
+          chmod +x build.sh || true
+
+      - name: Build macOS App
+        run: |
+          pyinstaller --noconfirm DELTARUNE_KR_Patcher.spec
+
+      - name: Compress macOS Release (.zip)
+        run: |
+          cd dist
+          zip -9 -r "DELTARUNE_KR_Patcher_macOS.zip" "델타룬 한글 패처.app"
+
+      - name: Upload macOS Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: DELTARUNE_KR_Patcher_macOS
+          path: dist/DELTARUNE_KR_Patcher_macOS.zip
+
+  build-linux:
+    name: Build Linux (.AppImage & .tar.xz)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install PySide6 pyxdelta pyinstaller
+
+      - name: Install AppImage Tool
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libfuse2 desktop-file-utils
+          sudo wget https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage -O /usr/local/bin/appimagetool
+          sudo chmod +x /usr/local/bin/appimagetool
+
+      - name: Execute Build Script
+        run: |
+          chmod +x build.sh
+          ./build.sh
+
+      - name: Upload Linux Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: DELTARUNE_KR_Patcher_Linux
+          path: dist/*.tar.xz
+
+  build-windows:
+    name: Build Windows (.exe & .zip)
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install PySide6 pyxdelta pyinstaller
+
+      - name: Execute Windows Build
+        run: |
+          .\build.bat
+        shell: cmd
+
+      - name: Upload Windows Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: DELTARUNE_KR_Patcher_Windows
+          path: dist/*.zip
+
+  release:
+    name: Create GitHub Release
+    needs: [build-macos, build-linux, build-windows]
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download macOS Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: DELTARUNE_KR_Patcher_macOS
+          path: release_assets
+
+      - name: Download Linux Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: DELTARUNE_KR_Patcher_Linux
+          path: release_assets
+
+      - name: Download Windows Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: DELTARUNE_KR_Patcher_Windows
+          path: release_assets
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: release_assets/*

@@ -219,10 +219,6 @@ def get_xdelta3_binary() -> str | None:
 def patchit(target_file: str, delta_file: str, log_cb=None):
     clean_target = redact_user_path(target_file)
     clean_delta = redact_user_path(delta_file)
-    
-    if log_cb:
-        log_cb(f"  [DEBUG] 대상 파일: {clean_target} ({fileinfo(target_file)})", "#88CCFF")
-        log_cb(f"  [DEBUG] 패치 파일: {clean_delta} ({fileinfo(delta_file)})", "#88CCFF")
 
     if not os.path.exists(target_file):
         raise RuntimeError(f"패치할 파일이 존재하지 않습니다: {clean_target}")

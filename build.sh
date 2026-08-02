@@ -25,27 +25,22 @@ if [ "$OS_NAME" = "Linux" ]; then
     # 1. PyInstaller build using spec file
     pyinstaller --noconfirm "$SCRIPT_DIR/DELTARUNE_KR_Patcher.spec"
 
-    if command -v upx &> /dev/null; then
-        echo "Compressing executable binary with UPX..."
-        upx --best "$SCRIPT_DIR/dist/DELTARUNE_KR_Patcher" 2>/dev/null || true
-    fi
-
     # 2. Build AppImage if appimagetool is available
     APP_DIR="$SCRIPT_DIR/dist/DELTARUNE_KR_Patcher.AppDir"
     mkdir -p "$APP_DIR/usr/bin"
-    cp "$SCRIPT_DIR/dist/DELTARUNE_KR_Patcher" "$APP_DIR/usr/bin/"
+    cp "$SCRIPT_DIR/dist/델타룬 한글 패처" "$APP_DIR/usr/bin/"
     
     cat << 'EOF' > "$APP_DIR/AppRun"
 #!/bin/sh
 HERE="$(dirname "$(readlink -f "${0}")")"
-exec "${HERE}/usr/bin/DELTARUNE_KR_Patcher" "$@"
+exec "${HERE}/usr/bin/델타룬 한글 패처" "$@"
 EOF
     chmod +x "$APP_DIR/AppRun"
 
     cat << 'EOF' > "$APP_DIR/deltarune_kr_patcher.desktop"
 [Desktop Entry]
-Name=DELTARUNE KR Patcher
-Exec=DELTARUNE_KR_Patcher
+Name=델타룬 한글 패처
+Exec=AppRun
 Icon=icon
 Type=Application
 Categories=Game;
@@ -63,24 +58,24 @@ EOF
 
     if command -v appimagetool &> /dev/null; then
         echo "Creating AppImage with appimagetool..."
-        rm -f "$SCRIPT_DIR/dist/DELTARUNE_KR_Patcher-x86_64.AppImage"
-        appimagetool "$APP_DIR" "$SCRIPT_DIR/dist/DELTARUNE_KR_Patcher-x86_64.AppImage"
-        echo "AppImage created: $SCRIPT_DIR/dist/DELTARUNE_KR_Patcher-x86_64.AppImage"
+        rm -f "$SCRIPT_DIR/dist/델타룬 한글 패처.AppImage"
+        appimagetool "$APP_DIR" "$SCRIPT_DIR/dist/델타룬 한글 패처.AppImage"
+        echo "AppImage created: $SCRIPT_DIR/dist/델타룬 한글 패처.AppImage"
     else
         echo "Note: appimagetool is not installed. Standalone single executable created at:"
-        echo "  $SCRIPT_DIR/dist/DELTARUNE_KR_Patcher"
+        echo "  $SCRIPT_DIR/dist/델타룬 한글 패처"
         echo "(To package into .AppImage, install appimagetool and rerun this script)."
     fi
 
-    echo "--- Compressing Linux Release (.tar.xz) ---"
+    echo "--- Compressing Linux Release (.tar.xz maximum -9 level) ---"
     (cd "$SCRIPT_DIR/dist" && {
-        if [ -f "DELTARUNE_KR_Patcher-x86_64.AppImage" ]; then
-            tar -cJf "DELTARUNE_KR_Patcher_Linux.tar.xz" "DELTARUNE_KR_Patcher-x86_64.AppImage"
+        if [ -f "델타룬 한글 패처.AppImage" ]; then
+            XZ_OPT=-9 tar -cJf "linux-2.1.3.tar.xz" "델타룬 한글 패처.AppImage"
         else
-            tar -cJf "DELTARUNE_KR_Patcher_Linux.tar.xz" "DELTARUNE_KR_Patcher"
+            XZ_OPT=-9 tar -cJf "linux-2.1.3.tar.xz" "델타룬 한글 패처"
         fi
     })
-    echo "Compressed release archive created at: $SCRIPT_DIR/dist/DELTARUNE_KR_Patcher_Linux.tar.xz"
+    echo "Compressed release archive created at: $SCRIPT_DIR/dist/linux-2.1.3.tar.xz"
 
 elif [ "$OS_NAME" = "Darwin" ]; then
     echo "--- Building macOS .app & Standalone Binary ---"
@@ -88,11 +83,11 @@ elif [ "$OS_NAME" = "Darwin" ]; then
     pyinstaller --noconfirm "$SCRIPT_DIR/DELTARUNE_KR_Patcher.spec"
         
     echo "macOS Application Bundle created at:"
-    echo "  $SCRIPT_DIR/dist/DELTARUNE_KR_Patcher.app"
+    echo "  $SCRIPT_DIR/dist/델타룬 한글 패처.app"
 
     echo "--- Compressing macOS Release ---"
-    (cd "$SCRIPT_DIR/dist" && zip -9 -q -r "DELTARUNE_KR_Patcher_macOS.zip" "DELTARUNE_KR_Patcher.app")
-    echo "Compressed release archive created at: $SCRIPT_DIR/dist/DELTARUNE_KR_Patcher_macOS.zip"
+    (cd "$SCRIPT_DIR/dist" && zip -9 -q -r "델타룬 한글 패처_macOS.zip" "델타룬 한글 패처.app")
+    echo "Compressed release archive created at: $SCRIPT_DIR/dist/델타룬 한글 패처_macOS.zip"
 
 else
     echo "Unsupported OS: $OS_NAME for build.sh script."
