@@ -1,4 +1,5 @@
 @echo off
+chcp 65001 >nul
 setlocal enabledelayedexpansion
 
 echo ========================================================
@@ -12,32 +13,30 @@ if %ERRORLEVEL% NEQ 0 (
     exit /b 1
 )
 
-set SCRIPT_DIR=%~dp0
-set ASSETS_DIR=%SCRIPT_DIR%orig\src\assets
+set "SCRIPT_DIR=%~dp0"
+set "ASSETS_DIR=%SCRIPT_DIR%orig\src\assets"
 
 if not exist "%ASSETS_DIR%" (
-    set ASSETS_DIR=%SCRIPT_DIR%assets
+    set "ASSETS_DIR=%SCRIPT_DIR%assets"
 )
 
 echo Using assets directory: %ASSETS_DIR%
 
 pyinstaller --noconfirm "%SCRIPT_DIR%DELTARUNE_KR_Patcher.spec"
+if %ERRORLEVEL% NEQ 0 (
+    echo Build failed during PyInstaller execution.
+    exit /b %ERRORLEVEL%
+)
 
 where upx >nul 2>&1
 if %ERRORLEVEL% EQU 0 (
-    echo Compressing executable with UPX (maximum compression --best)...
+    echo Compressing executable with UPX...
     upx --best "%SCRIPT_DIR%dist\델타룬 한글 패처.exe" 2>nul
 )
 
-if %ERRORLEVEL% EQU 0 (
-    echo.
-    echo Build completed successfully!
-    echo Executable generated at: %SCRIPT_DIR%dist\DELTARUNE_KR_Patcher.exe
-    echo Compressing executable into ZIP...
-    powershell -Command "Compress-Archive -Path '%SCRIPT_DIR%dist\델타룬 한글 패처.exe' -DestinationPath '%SCRIPT_DIR%dist\windows-2.1.3.zip' -Force"
-    echo Compressed release archive created at: %SCRIPT_DIR%dist\windows-2.1.3.zip
-) else (
-    echo.
-    echo Build failed with error code: %ERRORLEVEL%
-    exit /b %ERRORLEVEL%
-)
+echo.
+echo Build completed successfully!
+echo Executable generated at: %SCRIPT_DIR%dist\델타룬 한글 패처.exe
+echo Compressing executable into ZIP...
+powershell -Command "Compress-Archive -Path '%SCRIPT_DIR%dist\델타룬 한글 패처.exe' -DestinationPath '%SCRIPT_DIR%dist\windows-2.1.3.zip' -Force"
+echo Compressed release archive created at: %SCRIPT_DIR%dist\windows-2.1.3.zip

@@ -32,13 +32,27 @@ if os.path.exists(assets_dir):
 if os.path.exists(patch_dir):
     datas.append((patch_dir, 'patch'))
 
-icon_path = os.path.join(assets_dir, 'icon.ico')
-icon_arg = icon_path if os.path.exists(icon_path) else None
+icon_icns = os.path.join(assets_dir, 'icon.icns')
+icon_ico = os.path.join(assets_dir, 'icon.ico')
+icon_png = os.path.join(assets_dir, 'icon.png')
+
+if sys.platform == "darwin":
+    if os.path.exists(icon_icns):
+        icon_arg = icon_icns
+    elif os.path.exists(icon_png):
+        icon_arg = icon_png
+    else:
+        icon_arg = None
+elif sys.platform == "win32":
+    icon_arg = icon_ico if os.path.exists(icon_ico) else None
+else:
+    icon_arg = None
 
 # pip freeze 및 설치된 패키지의 top_level 모듈 자동 추출 후 필수 모듈 제외 전원 excludes 등록
 keep_pkgs = {
     'pyside6', 'pyside6_essentials', 'pyside6_addons', 'shiboken6',
     'pyxdelta', 'pyinstaller', 'pyinstaller-hooks-contrib', 'altgraph',
+    'pil', 'pillow',
 }
 
 pip_excludes = set()
