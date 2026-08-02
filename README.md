@@ -1,0 +1,118 @@
+# 현재 웹 기반 패처도 제작중입니다!
+<br>
+# DELTARUNE KR Patcher (델타룬 한글 패처)
+최적화된 델타룬 한글 패쳐
+
+---
+
+## 기능
+- 델타룬 한글 패처 프로그램
+
+---
+
+## 델타룬 패치 폴더 구조
+
+패처 실행 시 `patch/` 디렉터리에 아래와 같은 패치 파일들이 준비되어 있어야 합니다.
+
+```text
+patch/
+├── lang/                      # 게임 내 적용될 한글 언어 파일/폴더
+└── xdelta/                    # xdelta 바이너리 패치 파일
+    ├── launcher.xdelta        # (선택) 런처 데이터 패치 파일
+    ├── ch<i>.xdelta             # 챕터 <i> 패치 파일
+```
+
+---
+
+## 요구 사항
+
+### 소스코드 실행 시
+- **Python**: 3.10 이상 권장
+- **필수 패키지**:
+  ```bash
+  pip install PySide6 pyxdelta
+  ```
+
+---
+
+## 실행 및 사용 방법
+
+### 1. 미리 빌드된 프로그램 실행
+1. Releases에서 최신 버전은 다운로드 받으세요.
+2. 실행하세요.
+> Windows 버전은 Windows 11에서 빌드되었으며,
+> Linux 버전은 EndeavourOS에서 빌드되었습니다.
+
+### 2. 소스 코드로 실행하기
+```bash
+python patcher.py
+```
+
+### 3. 패치 적용 방법
+1. 프로그램을 실행하면 스팀에 설치된 DELTARUNE 폴더가 자동으로 감지되어 표시됩니다.
+2. 자동 감지가 되지 않은 경우 **[폴더 선택]** 버튼을 눌러 DELTARUNE이 설치된 폴더를 직접 선택합니다.
+3. **[패치 적용]** 버튼을 클릭하여 패치를 진행합니다.
+4. 하단 로그 창에서 패치 진행 상황을 확인하고 완료 메시지가 뜨면 게임을 실행합니다.
+
+---
+
+## 실행 파일 빌드
+
+PyInstaller를 이용해 Windows, Linux, macOS용 단일 실행 파일 및 앱 패키지를 생성할 수 있습니다.
+
+### 사전 준비 (PyInstaller 설치)
+```bash
+pip install pyinstaller PySide6 pyxdelta
+```
+
+### Windows (`.exe` 빌드)
+`build.bat` 스크립트를 실행합니다.
+```cmd
+build.bat
+```
+- 빌드 결과물: `dist/DELTARUNE_KR_Patcher.exe`
+
+### Linux (단일 바이너리 & AppImage 빌드)
+`build.sh` 스크립트를 실행합니다.
+```bash
+chmod +x build.sh
+./build.sh
+```
+- 빌드 결과물: `dist/DELTARUNE_KR_Patcher` (필요 시 `appimagetool`이 설치되어 있으면 `.AppImage`도 자동 생성)
+
+### macOS (`.app` 번들 빌드)
+`build.sh` 스크립트를 실행합니다.
+```bash
+chmod +x build.sh
+./build.sh
+```
+- 빌드 결과물: `dist/DELTARUNE_KR_Patcher.app`
+
+---
+
+## 구조
+
+```text
+deltarunekr_patcher/
+├── assets/                     # UI 리소스 (폰트, 테두리 텍스처, 아이콘)
+│   ├── DeterminationSansK2.ttf
+│   ├── border_texture.png
+│   └── icon.ico
+├── patch/                      # 패치 파일 저장용 디렉터리
+│   ├── lang/
+│   └── xdelta/
+├── patcher.py                  # PySide6 GUI 메인 애플리케이션
+├── build.bat                   # Windows 빌드 스크립트
+├── build.sh                    # Linux / macOS 빌드 스크립트
+├── DELTARUNE_KR_Patcher.spec   # PyInstaller 설정 파일
+└── README.md
+```
+
+---
+
+## 📜 라이선스 및 참고 사항 (Notice)
+
+- DeterminationSansK2는 [https://m.dcinside.com/board/game_nintendo/1476022](https://m.dcinside.com/board/game_nintendo/1476022)에서 가져왔습니다.
+- 패치 파일은 dtkrpatchteam이 제작한 파일을 사용하였습니다.
+- 직접 실행 & 빌드의 경우, 패치 파일을 구조에 따라 포함하셔야 합니다.
+- DELTARUNE의 원작권은 **Toby Fox**에게 있습니다.
