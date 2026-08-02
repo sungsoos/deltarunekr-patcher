@@ -1,7 +1,6 @@
 from PySide6.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QTextEdit, QFileDialog, QFrame, QSizePolicy
 from PySide6.QtGui import QFontDatabase, QFont, QIcon, QGuiApplication, QPainter, QPixmap, QColor
 from PySide6.QtCore import Qt, QPoint, Signal, QObject, QTimer, QRect
-import traceback
 import threading
 import pyxdelta
 import getpass
@@ -14,7 +13,20 @@ import re
 def resource_path(relative_path: str) -> str:
     """파일 경로 구하기"""
     if hasattr(sys, '_MEIPASS'):
-        return os.path.join(sys._MEIPASS, relative_path)
+        path_meipass = os.path.join(sys._MEIPASS, relative_path)
+        if os.path.exists(path_meipass):
+            return path_meipass
+
+    if getattr(sys, 'frozen', False):
+        exe_dir = os.path.dirname(sys.executable)
+        exe_candidates = [
+            os.path.join(exe_dir, relative_path),
+            os.path.join(exe_dir, "..", "Resources", relative_path),
+        ]
+        for cand in exe_candidates:
+            if os.path.exists(cand):
+                return cand
+
     candidates = [
         os.path.join(os.path.dirname(__file__), relative_path),
         os.path.join(os.path.dirname(__file__), "orig", "src", relative_path),

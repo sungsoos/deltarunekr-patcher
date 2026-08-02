@@ -43,11 +43,17 @@ Name=DELTARUNE KR Patcher
 Exec=DELTARUNE_KR_Patcher
 Icon=icon
 Type=Application
-Categories=Utility;Game;
+Categories=Game;
 EOF
 
-    if [ -f "$ASSETS_DIR/icon.ico" ]; then
-        cp "$ASSETS_DIR/icon.ico" "$APP_DIR/icon.ico"
+    if [ -f "$ASSETS_DIR/icon.png" ]; then
+        cp "$ASSETS_DIR/icon.png" "$APP_DIR/icon.png"
+        cp "$ASSETS_DIR/icon.png" "$APP_DIR/.DirIcon"
+    elif [ -f "$ASSETS_DIR/icon.ico" ]; then
+        python3 -c "from PySide6.QtGui import QImage; img = QImage('$ASSETS_DIR/icon.ico'); img.save('$APP_DIR/icon.png')" 2>/dev/null || cp "$ASSETS_DIR/icon.ico" "$APP_DIR/icon.ico"
+        if [ -f "$APP_DIR/icon.png" ]; then
+            cp "$APP_DIR/icon.png" "$APP_DIR/.DirIcon"
+        fi
     fi
 
     if command -v appimagetool &> /dev/null; then

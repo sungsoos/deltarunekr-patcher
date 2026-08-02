@@ -6,9 +6,25 @@ spec_dir = SPECPATH
 
 assets_dir = os.path.join(spec_dir, 'assets')
 if not os.path.exists(assets_dir):
-    assets_dir = os.path.join(spec_dir, 'orig', 'src', 'assets')
+    candidates = [
+        os.path.join(spec_dir, 'orig', 'src', 'assets'),
+        os.path.join(spec_dir, 'src', 'assets'),
+    ]
+    for cand in candidates:
+        if os.path.exists(cand):
+            assets_dir = cand
+            break
 
 patch_dir = os.path.join(spec_dir, 'patch')
+if not os.path.exists(patch_dir):
+    candidates = [
+        os.path.join(spec_dir, 'orig', 'src', 'patch'),
+        os.path.join(spec_dir, 'src', 'patch'),
+    ]
+    for cand in candidates:
+        if os.path.exists(cand):
+            patch_dir = cand
+            break
 
 datas = []
 if os.path.exists(assets_dir):
@@ -19,6 +35,18 @@ if os.path.exists(patch_dir):
 icon_path = os.path.join(assets_dir, 'icon.ico')
 icon_arg = icon_path if os.path.exists(icon_path) else None
 
+excludes = [
+    'pygame',
+    'tkinter',
+    'matplotlib',
+    'numpy',
+    'scipy',
+    'unittest',
+    'doctest',
+    'pydoc',
+    'xmlrpc',
+]
+
 a = Analysis(
     [os.path.join(spec_dir, 'patcher.py')],
     pathex=[],
@@ -28,7 +56,7 @@ a = Analysis(
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=[],
+    excludes=excludes,
     noarchive=False,
     optimize=0,
 )
