@@ -21,10 +21,17 @@ if not exist "%ASSETS_DIR%" (
 
 echo Using assets directory: %ASSETS_DIR%
 
+set PATCH_DIR=%SCRIPT_DIR%patch
+set PATCH_DATA=
+if exist "%PATCH_DIR%" (
+    set PATCH_DATA=--add-data "%PATCH_DIR%;patch"
+)
+
 pyinstaller --noconfirm --onefile --windowed ^
     --name "DELTARUNE_KR_Patcher" ^
     --icon "%ASSETS_DIR%\icon.ico" ^
     --add-data "%ASSETS_DIR%;assets" ^
+    !PATCH_DATA! ^
     "%SCRIPT_DIR%patcher.py"
 
 if %ERRORLEVEL% EQU 0 (

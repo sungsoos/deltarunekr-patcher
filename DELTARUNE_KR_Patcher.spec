@@ -1,11 +1,25 @@
 # -*- mode: python ; coding: utf-8 -*-
+import os
 
+spec_dir = SPECPATH
+
+assets_dir = os.path.join(spec_dir, 'assets')
+if not os.path.exists(assets_dir):
+    assets_dir = os.path.join(spec_dir, 'orig', 'src', 'assets')
+
+patch_dir = os.path.join(spec_dir, 'patch')
+
+datas = []
+if os.path.exists(assets_dir):
+    datas.append((assets_dir, 'assets'))
+if os.path.exists(patch_dir):
+    datas.append((patch_dir, 'patch'))
 
 a = Analysis(
-    ['/home/sungsoos/바탕화면/git/deltarunekr_patcher/patcher.py'],
+    [os.path.join(spec_dir, 'patcher.py')],
     pathex=[],
     binaries=[],
-    datas=[('/home/sungsoos/바탕화면/git/deltarunekr_patcher/assets', 'assets')],
+    datas=datas,
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},

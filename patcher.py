@@ -531,6 +531,12 @@ class DeltarunePatcherWindow(QMainWindow):
         try:
             is_mac = (sys.platform == "darwin")
 
+            xdelta_folder = "xdelta_mac" if (is_mac and (os.path.exists(os.path.join(patch_dir, "xdelta_mac")) or not os.path.exists(os.path.join(patch_dir, "xdelta")))) else "xdelta"
+            xdelta_dir = os.path.join(patch_dir, xdelta_folder)
+
+            lang_folder = "lang_mac" if (is_mac and (os.path.exists(os.path.join(patch_dir, "lang_mac")) or not os.path.exists(os.path.join(patch_dir, "lang")))) else "lang"
+            lang_src = os.path.join(patch_dir, lang_folder)
+
             # launcher 검증
             launcher_delta = os.path.join(xdelta_dir, "launcher.xdelta")
             valid_launcher_target = None
@@ -557,7 +563,7 @@ class DeltarunePatcherWindow(QMainWindow):
             for i in range(1, 6):
                 delta = os.path.join(xdelta_dir, f"ch{i}.xdelta")
                 if not os.path.exists(delta):
-                    err = f"챕터 {i} 패치 파일(ch{i}.xdelta)이 존재하지 않습니다."
+                    err = f"챕터 {i} 패치 파일({xdelta_folder}/ch{i}.xdelta)이 존재하지 않습니다."
                     log_cb(f"* 검증 실패: {err}", "#FF5555")
                     self.bridge.finish_signal.emit(False)
                     return
@@ -587,10 +593,8 @@ class DeltarunePatcherWindow(QMainWindow):
 
                 valid_chapter_targets.append({"chapter": i, "targetFile": found_target, "deltaFile": delta})
 
-            # 언어 폴더
-            lang_src = os.path.join(patch_dir, "lang")
             if not os.path.exists(lang_src):
-                err = "패처에서 언어 폴더(./patch/lang)를 찾을 수 없습니다."
+                err = f"패처에서 언어 폴더(./patch/{lang_folder})를 찾을 수 없습니다."
                 log_cb(f"* 검증 실패: {err}", "#FF5555")
                 self.bridge.finish_signal.emit(False)
                 return

@@ -15,10 +15,17 @@
 
 ```text
 patch/
-├── lang/                      # 게임 내 적용될 한글 언어 파일/폴더
-└── xdelta/                    # xdelta 바이너리 패치 파일
-    ├── launcher.xdelta        # (선택) 런처 데이터 패치 파일
-    └── ch<i>.xdelta             # 챕터 <i> 패치 파일
+├── lang/                      # 게임 내 적용될 한글 언어 파일/폴더 (Windows/Linux)
+│
+├── lang_mac/                  # macOS 전용 한글 언어 파일/폴더
+│
+├── xdelta/                    # xdelta 바이너리 패치 파일 (Windows/Linux)
+│   ├── launcher.xdelta       # 런처 데이터 패치 파일
+│   └── ch<i>.xdelta          # 챕터 <i> 패치 파일
+│
+└── xdelta_mac/                # macOS 전용 xdelta 바이너리 패치 파일
+    ├── launcher.xdelta        # macOS 런처 데이터 패치 파일
+    └── ch<i>.xdelta           # macOS 챕터 <i> 패치 파일
 ```
 
 ---
