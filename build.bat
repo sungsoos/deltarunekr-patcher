@@ -37,6 +37,3 @@ if %ERRORLEVEL% EQU 0 (
 echo.
 echo Build completed successfully!
 echo Executable generated at: %SCRIPT_DIR%dist\DELTARUNE_KR_Patcher.exe
-echo Compressing executable into ZIP...
-powershell -Command "Compress-Archive -Path '%SCRIPT_DIR%dist\DELTARUNE_KR_Patcher.exe' -DestinationPath '%SCRIPT_DIR%dist\DELTARUNE_KR_Patcher_Windows.zip' -Force"
-echo Compressed release archive created at: %SCRIPT_DIR%dist\DELTARUNE_KR_Patcher_Windows.zip

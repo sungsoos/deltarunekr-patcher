@@ -32,7 +32,7 @@ jobs:
         run: |
           pyinstaller --noconfirm DELTARUNE_KR_Patcher.spec
 
-      - name: 압축
+      - name: 압축 (macOS App Bundle)
         run: |
           cd dist
           zip -9 -r "DELTARUNE_KR_Patcher_macOS.zip" "DELTARUNE_KR_Patcher.app"
@@ -78,7 +78,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: Linux
-          path: dist/*.tar.xz
+          path: |
+            dist/DELTARUNE_KR_Patcher-x86_64.AppImage
+            dist/DELTARUNE_KR_Patcher
 
   build-windows:
     name: Windows
@@ -108,7 +110,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: Windows
-          path: dist/*.zip
+          path: dist/DELTARUNE_KR_Patcher.exe
 
   release:
     name: Create GitHub Release

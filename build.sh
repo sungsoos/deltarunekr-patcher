@@ -67,20 +67,9 @@ EOF
         appimagetool "$APP_DIR" "$SCRIPT_DIR/dist/DELTARUNE_KR_Patcher-x86_64.AppImage"
         echo "AppImage created: $SCRIPT_DIR/dist/DELTARUNE_KR_Patcher-x86_64.AppImage"
     else
-        echo "Note: appimagetool is not installed. Standalone single executable created at:"
+        echo "Standalone single executable created at:"
         echo "  $SCRIPT_DIR/dist/DELTARUNE_KR_Patcher"
-        echo "(To package into .AppImage, install appimagetool and rerun this script)."
     fi
-
-    echo "--- Compressing Linux Release (.tar.xz maximum -9 level) ---"
-    (cd "$SCRIPT_DIR/dist" && {
-        if [ -f "DELTARUNE_KR_Patcher-x86_64.AppImage" ]; then
-            XZ_OPT=-9 tar -cJf "DELTARUNE_KR_Patcher_Linux.tar.xz" "DELTARUNE_KR_Patcher-x86_64.AppImage"
-        else
-            XZ_OPT=-9 tar -cJf "DELTARUNE_KR_Patcher_Linux.tar.xz" "DELTARUNE_KR_Patcher"
-        fi
-    })
-    echo "Compressed release archive created at: $SCRIPT_DIR/dist/DELTARUNE_KR_Patcher_Linux.tar.xz"
 
 elif [ "$OS_NAME" = "Darwin" ]; then
     echo "--- Building macOS .app & Standalone Binary ---"
@@ -88,11 +77,7 @@ elif [ "$OS_NAME" = "Darwin" ]; then
     pyinstaller --noconfirm "$SCRIPT_DIR/DELTARUNE_KR_Patcher.spec"
         
     echo "macOS Application Bundle created at:"
-    echo "  $SCRIPT_DIR/dist/델타룬 한글 패처.app"
-
-    echo "--- Compressing macOS Release ---"
-    (cd "$SCRIPT_DIR/dist" && zip -9 -q -r "델타룬 한글 패처_macOS.zip" "델타룬 한글 패처.app")
-    echo "Compressed release archive created at: $SCRIPT_DIR/dist/델타룬 한글 패처_macOS.zip"
+    echo "  $SCRIPT_DIR/dist/DELTARUNE_KR_Patcher.app"
 
 else
     echo "Unsupported OS: $OS_NAME for build.sh script."
