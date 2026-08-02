@@ -36,7 +36,7 @@ patch/
 ## 요구 사항
 ### 미리 빌드된 파일을 실행할 시
 - 수정되지 않은 델타룬 게임
-- Windows 10+ 혹은 MacOS ?? (테스트 필요) 혹은 AppImage를 실행할 수 있는 Linux 배포판
+- Windows 10+ 혹은 MacOS 15+ (테스트 필요) 혹은 AppImage를 실행할 수 있는 Linux 배포판
 ### 소스코드 실행 시
 -  **Python**: 3.10 이상 권장
 -  **필수 패키지**:
@@ -107,5 +107,4 @@ deltarunekr_patcher/
 ## 📜 라이선스 및 참고 사항 (Notice)
 - DeterminationSansK2는 [https://m.dcinside.com/board/game_nintendo/1476022](https://m.dcinside.com/board/game_nintendo/1476022)에서 가져왔습니다.
 - 패치 파일은 dtkrpatchteam이 제작한 파일을 사용하였습니다.
-- 직접 실행 & 빌드의 경우, 패치 파일을 구조에 따라 포함하셔야 합니다.
 - DELTARUNE의 원작권은 **Toby Fox**에게 있습니다.# 현재 웹 기반 패처도 제작중입니다!
