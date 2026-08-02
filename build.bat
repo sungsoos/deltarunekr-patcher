@@ -31,12 +31,12 @@ if %ERRORLEVEL% NEQ 0 (
 where upx >nul 2>&1
 if %ERRORLEVEL% EQU 0 (
     echo Compressing executable with UPX...
-    upx --best "%SCRIPT_DIR%dist\델타룬 한글 패처.exe" 2>nul
+    upx "%SCRIPT_DIR%dist\DELTARUNE_KR_Patcher.exe" 2>nul
 )
 
 echo.
 echo Build completed successfully!
-echo Executable generated at: %SCRIPT_DIR%dist\델타룬 한글 패처.exe
+echo Executable generated at: %SCRIPT_DIR%dist\DELTARUNE_KR_Patcher.exe
 echo Compressing executable into ZIP...
-powershell -Command "Compress-Archive -Path '%SCRIPT_DIR%dist\델타룬 한글 패처.exe' -DestinationPath '%SCRIPT_DIR%dist\windows-2.1.3.zip' -Force"
-echo Compressed release archive created at: %SCRIPT_DIR%dist\windows-2.1.3.zip
+powershell -Command "Compress-Archive -Path '%SCRIPT_DIR%dist\DELTARUNE_KR_Patcher.exe' -DestinationPath '%SCRIPT_DIR%dist\DELTARUNE_KR_Patcher_Windows.zip' -Force"
+echo Compressed release archive created at: %SCRIPT_DIR%dist\DELTARUNE_KR_Patcher_Windows.zip

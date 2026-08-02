@@ -35,7 +35,7 @@ jobs:
       - name: 압축
         run: |
           cd dist
-          zip -9 -r "DELTARUNE_KR_Patcher_macOS.zip" "델타룬 한글 패처.app"
+          zip -9 -r "DELTARUNE_KR_Patcher_macOS.zip" "DELTARUNE_KR_Patcher.app"
 
       - name: 업로드
         uses: actions/upload-artifact@v4
