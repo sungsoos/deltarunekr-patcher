@@ -1,5 +1,4 @@
 # 현재 웹 기반 패처도 제작중입니다!
-<br>
 # DELTARUNE KR Patcher (델타룬 한글 패처)
 최적화된 델타룬 한글 패쳐
 
@@ -19,7 +18,7 @@ patch/
 ├── lang/                      # 게임 내 적용될 한글 언어 파일/폴더
 └── xdelta/                    # xdelta 바이너리 패치 파일
     ├── launcher.xdelta        # (선택) 런처 데이터 패치 파일
-    ├── ch<i>.xdelta             # 챕터 <i> 패치 파일
+    └── ch<i>.xdelta             # 챕터 <i> 패치 파일
 ```
 
 ---
@@ -40,8 +39,7 @@ patch/
 ### 1. 미리 빌드된 프로그램 실행
 1. Releases에서 최신 버전은 다운로드 받으세요.
 2. 실행하세요.
-> Windows 버전은 Windows 11에서 빌드되었으며,
-> Linux 버전은 EndeavourOS에서 빌드되었습니다.
+> Windows 11, MacOS 15 (Github Actions), EndeavourOS에서 빌드되었습니다
 
 ### 2. 소스 코드로 실행하기
 ```bash
