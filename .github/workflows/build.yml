@@ -111,34 +111,3 @@ jobs:
         with:
           name: Windows
           path: dist/DELTARUNE_KR_Patcher.exe
-
-  release:
-    name: Create GitHub Release
-    needs: [build-macos, build-linux, build-windows]
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-
-    steps:
-      - name: Download macOS Artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: macOS
-          path: release_assets
-
-      - name: Download Linux Artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: Linux
-          path: release_assets
-
-      - name: Download Windows Artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: Windows
-          path: release_assets
-
-      - name: Create Release
-        uses: softprops/action-gh-release@v2
-        with:
-          files: release_assets/*
