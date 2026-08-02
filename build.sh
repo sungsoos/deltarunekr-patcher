@@ -19,21 +19,11 @@ fi
 
 OS_NAME="$(uname -s)"
 
-PATCH_DIR="$SCRIPT_DIR/patch"
-PATCH_DATA=""
-if [ -d "$PATCH_DIR" ]; then
-    PATCH_DATA="--add-data $PATCH_DIR:patch"
-fi
-
 if [ "$OS_NAME" = "Linux" ]; then
     echo "--- Building Linux Onefile Binary & AppImage ---"
     
-    # 1. PyInstaller single file build
-    pyinstaller --noconfirm --onefile --windowed \
-        --name "DELTARUNE_KR_Patcher" \
-        --add-data "$ASSETS_DIR:assets" \
-        $PATCH_DATA \
-        "$SCRIPT_DIR/patcher.py"
+    # 1. PyInstaller build using spec file
+    pyinstaller --noconfirm "$SCRIPT_DIR/DELTARUNE_KR_Patcher.spec"
 
     # 2. Build AppImage if appimagetool is available
     APP_DIR="$SCRIPT_DIR/dist/DELTARUNE_KR_Patcher.AppDir"
@@ -73,12 +63,7 @@ EOF
 elif [ "$OS_NAME" = "Darwin" ]; then
     echo "--- Building macOS .app & Standalone Binary ---"
     
-    pyinstaller --noconfirm --onedir --windowed \
-        --name "DELTARUNE_KR_Patcher" \
-        --icon "$ASSETS_DIR/icon.ico" \
-        --add-data "$ASSETS_DIR:assets" \
-        $PATCH_DATA \
-        "$SCRIPT_DIR/patcher.py"
+    pyinstaller --noconfirm "$SCRIPT_DIR/DELTARUNE_KR_Patcher.spec"
         
     echo "macOS Application Bundle created at:"
     echo "  $SCRIPT_DIR/dist/DELTARUNE_KR_Patcher.app"
