@@ -46,7 +46,7 @@ patch/
 ### 1. 미리 빌드된 프로그램 실행
 1. Releases에서 최신 버전은 다운로드 받으세요.
 2. 실행하세요.
-> Windows 11, MacOS 15 (Github Actions), EndeavourOS에서 빌드되었습니다
+> Windows Server 2025, MacOS 15, Ubuntu 24.04에서 빌드되었습니다 (Github Actions)
 
 ### 2. 소스 코드로 실행하기
 ```bash
