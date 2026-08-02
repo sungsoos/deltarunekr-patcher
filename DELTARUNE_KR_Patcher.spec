@@ -58,7 +58,7 @@ a = Analysis(
     runtime_hooks=[],
     excludes=excludes,
     noarchive=False,
-    optimize=0,
+    optimize=2,
 )
 pyz = PYZ(a.pure)
 
@@ -68,7 +68,7 @@ if sys.platform == "darwin":
         a.scripts,
         [],
         exclude_binaries=True,
-        name='DELTARUNE_KR_Patcher',
+        name='델타룬 한글 패처',
         debug=False,
         bootloader_ignore_signals=False,
         strip=False,
@@ -88,11 +88,11 @@ if sys.platform == "darwin":
         strip=False,
         upx=True,
         upx_exclude=[],
-        name='DELTARUNE_KR_Patcher',
+        name='델타룬 한글 패처',
     )
     app = BUNDLE(
         coll,
-        name='DELTARUNE_KR_Patcher.app',
+        name='델타룬 한글 패처.app',
         icon=icon_arg,
         bundle_identifier=None,
     )
@@ -103,7 +103,7 @@ else:
         a.binaries,
         a.datas,
         [],
-        name='DELTARUNE_KR_Patcher',
+        name='델타룬 한글 패처',
         debug=False,
         bootloader_ignore_signals=False,
         strip=False,

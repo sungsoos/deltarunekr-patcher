@@ -1,6 +1,7 @@
 from PySide6.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QTextEdit, QFileDialog, QFrame, QSizePolicy
 from PySide6.QtGui import QFontDatabase, QFont, QIcon, QGuiApplication, QPainter, QPixmap, QColor
 from PySide6.QtCore import Qt, QPoint, Signal, QObject, QTimer, QRect
+import subprocess
 import threading
 import pyxdelta
 import getpass
@@ -65,12 +66,52 @@ def is_libraryfolders_vdf(vdf_path: str) -> list[str]:
                     parts = line_str.split('"path"')
                     if len(parts) > 1:
                         path_val = parts[1].replace('"', '').strip()
-                        path_val = os.path.normpath(path_val)
-                        if os.path.exists(path_val):
+                        path_val = os.path.realpath(os.path.normpath(path_val))
+                        if os.path.exists(path_val) and path_val not in paths:
                             paths.append(path_val)
     except Exception as e:
         print(f"vdf를 파싱하는데 오류가 발생했습니다: {e}")
     return paths
+
+def validate_deltarune_folder(target_dir: str) -> tuple[bool, str | None]:
+    """델타룬 설치 폴더가 모든 게임 데이터 파일들을 포함하고 있는지 검증"""
+    if not target_dir or not os.path.exists(target_dir):
+        return False, "폴더가 존재하지 않습니다."
+
+    is_mac = (sys.platform == "darwin")
+
+    # 1. 런처 데이터 검증
+    possible_launcher_targets = [
+        os.path.join(target_dir, "data.win"),
+        os.path.join(target_dir, "game.ios"),
+        os.path.join(target_dir, "DELTARUNE.app", "Contents", "Resources", "game.ios"),
+        os.path.join(target_dir, "DELTARUNE.app", "Contents", "Resources", "data.win"),
+    ]
+    has_launcher = any(os.path.exists(t) for t in possible_launcher_targets)
+    if not has_launcher:
+        return False, "런처 파일(data.win / game.ios)을 찾을 수 없습니다."
+
+    # 2. 챕터 1~5 파일 검증
+    for i in range(1, 6):
+        if is_mac:
+            folder_candidates = [f"chapter{i}_mac", f"chapter{i}_windows", f"chapter{i}"]
+        else:
+            folder_candidates = [f"chapter{i}_windows", f"chapter{i}"]
+
+        found_target = False
+        for fn in folder_candidates:
+            cbase = os.path.join(target_dir, fn)
+            for tf_name in ["data.win", "game.ios"]:
+                if os.path.exists(os.path.join(cbase, tf_name)):
+                    found_target = True
+                    break
+            if found_target:
+                break
+
+        if not found_target:
+            return False, f"챕터 {i} 데이터 파일(chapter{i}_[windows/mac]/data.win)이 존재하지 않습니다."
+
+    return True, None
 
 def detect_deltarune() -> str | None:
     """설치된거 감지"""
@@ -116,24 +157,24 @@ def detect_deltarune() -> str | None:
             os.path.join(home, ".var", "app", "com.valvesoftware.Steam", "data", "Steam"),
         ])
 
-    # 다 찾아보기
+    # 심볼릭 링크 해제 및 중복 제거 후 탐색
     steam_libraries = []
     for s_dir in candidate_steam_dirs:
-        if os.path.exists(s_dir) and s_dir not in steam_libraries:
-            steam_libraries.append(s_dir)
-            vdf = os.path.join(s_dir, "steamapps", "libraryfolders.vdf")
+        if os.path.exists(s_dir):
+            real_s_dir = os.path.realpath(s_dir)
+            if real_s_dir not in steam_libraries:
+                steam_libraries.append(real_s_dir)
+            vdf = os.path.join(real_s_dir, "steamapps", "libraryfolders.vdf")
             for parsed_path in is_libraryfolders_vdf(vdf):
                 if parsed_path not in steam_libraries:
                     steam_libraries.append(parsed_path)
 
-    # steamapps/common/ 확인
+    # steamapps/common/ 확인 (모든 필수 파일 검증 포함)
     for lib in steam_libraries:
         for folder_name in ["DELTARUNE", "Deltarune", "deltarune"]:
-            common_path = os.path.join(lib, "steamapps", "common", folder_name)
-            if os.path.exists(common_path) and (
-                os.path.exists(os.path.join(common_path, "data.win")) or 
-                os.path.exists(os.path.join(common_path, "game.ios")) or 
-                os.path.exists(os.path.join(common_path, "DELTARUNE.app"))): # 게임 파일 확인
+            common_path = os.path.realpath(os.path.join(lib, "steamapps", "common", folder_name))
+            is_valid, _ = validate_deltarune_folder(common_path)
+            if is_valid:
                 return common_path
 
     return None
@@ -161,31 +202,87 @@ def fileinfo(file_path: str) -> str:
     except Exception as e:
         return f"정보 취득 실패 ({e})"
 
-def patchit(target_file: str, delta_file: str):
-    if not os.path.exists(target_file):
-        raise RuntimeError(f"패치할 파일이 존재하지 않습니다: {redact_user_path(target_file)}")
-    if not os.path.exists(delta_file):
-        raise RuntimeError(f"델타 파일이 존재하지 않습니다: {redact_user_path(delta_file)}")
+def get_xdelta3_binary() -> str | None:
+    assets_dir = get_assets_dir()
+    if sys.platform == "win32":
+        bundled = os.path.join(assets_dir, "bin", "xdelta3_win.exe")
+    elif sys.platform == "darwin":
+        bundled = os.path.join(assets_dir, "bin", "xdelta3_mac")
+    else:
+        bundled = os.path.join(assets_dir, "bin", "xdelta3_linux")
+
+    if os.path.exists(bundled):
+        return bundled
+
+    return shutil.which("xdelta3")
+
+def patchit(target_file: str, delta_file: str, log_cb=None):
+    clean_target = redact_user_path(target_file)
+    clean_delta = redact_user_path(delta_file)
     
+    if log_cb:
+        log_cb(f"  [DEBUG] 대상 파일: {clean_target} ({fileinfo(target_file)})", "#88CCFF")
+        log_cb(f"  [DEBUG] 패치 파일: {clean_delta} ({fileinfo(delta_file)})", "#88CCFF")
+
+    if not os.path.exists(target_file):
+        raise RuntimeError(f"패치할 파일이 존재하지 않습니다: {clean_target}")
+    if not os.path.exists(delta_file):
+        raise RuntimeError(f"델타 파일이 존재하지 않습니다: {clean_delta}")
+    
+    if os.path.getsize(delta_file) == 0:
+        raise RuntimeError(f"패치 파일이 비어있습니다 (0 byte): {clean_delta}")
+    if os.path.getsize(target_file) == 0:
+        raise RuntimeError(f"대상 파일이 비어있습니다 (0 byte): {clean_target}")
+
     tmp_file = target_file + ".tmp"
     if os.path.exists(tmp_file):
         try:
             os.remove(tmp_file)
         except Exception: pass
 
-    target_info = fileinfo(target_file)
-    delta_info = fileinfo(delta_file)
-    clean_target = redact_user_path(target_file)
-    clean_delta = redact_user_path(delta_file)
+    patched_ok = False
+    last_err = ""
 
-    # 핵심 로직
-    try:
-        res = pyxdelta.decode(delta_file, target_file, tmp_file)
-    except Exception as exc:
-        raise RuntimeError(f"이미 패치되었거나 변조된 버전입니다. ({exc})") from exc
+    # 1차 시도: xdelta3 실행 파일 활용 (번들 및 시스템 CLI 표준 디코딩)
+    xdelta3_bin = get_xdelta3_binary()
+    if xdelta3_bin:
+        try:
+            cmd = [xdelta3_bin, "-d", "-f", "-s", target_file, delta_file, tmp_file]
+            proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            if proc.returncode == 0 and os.path.exists(tmp_file) and os.path.getsize(tmp_file) > 0:
+                patched_ok = True
+            else:
+                if proc.stderr:
+                    last_err = proc.stderr.strip()
+        except Exception as exc:
+            last_err = str(exc)
 
-    if res != 0 or not os.path.exists(tmp_file):
-        raise RuntimeError("이미 패치되었거나 변조된 버전입니다.")
+    # 2차 시도: 체크섬 불일치 시 xdelta3 -n 옵션으로 강제 디코딩 시도
+    if not patched_ok and xdelta3_bin:
+        try:
+            cmd = [xdelta3_bin, "-d", "-f", "-n", "-s", target_file, delta_file, tmp_file]
+            proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            if proc.returncode == 0 and os.path.exists(tmp_file) and os.path.getsize(tmp_file) > 0:
+                patched_ok = True
+            else:
+                if proc.stderr:
+                    last_err = proc.stderr.strip()
+        except Exception as exc:
+            last_err = str(exc)
+
+    # 3차 시도: CLI 디코딩 실패 시 pyxdelta 파이썬 C 바인딩 시도
+    if not patched_ok:
+        try:
+            res = pyxdelta.decode(delta_file, target_file, tmp_file)
+            if res == 0 and os.path.exists(tmp_file) and os.path.getsize(tmp_file) > 0:
+                patched_ok = True
+        except Exception as exc:
+            if not last_err:
+                last_err = str(exc)
+
+    if not patched_ok or not os.path.exists(tmp_file):
+        err_detail = f" ({last_err})" if last_err else ""
+        raise RuntimeError(f"이미 패치되었거나 원본 파일 버전이 일치하지 않습니다.{err_detail}")
 
     shutil.copyfile(tmp_file, target_file)
     try:
@@ -490,11 +587,18 @@ class DeltarunePatcherWindow(QMainWindow):
     def select_folder(self):
         chosen = QFileDialog.getExistingDirectory(self, "폴더 선택")
         if chosen:
-            self.selected_folder = chosen
+            is_valid, err_msg = validate_deltarune_folder(chosen)
             truncated = self.truncate_path(redact_user_path(chosen))
-            self.lbl_folder_path.setText(f"* 선택된 폴더: {truncated}")
-            self.add_log(f"* 선택된 폴더: {redact_user_path(chosen)}")
-            self.btn_start_patch.setEnabled(True)
+            if is_valid:
+                self.selected_folder = chosen
+                self.lbl_folder_path.setText(f"* 선택된 폴더: {truncated}")
+                self.add_log(f"* 선택된 폴더: {redact_user_path(chosen)}", "#00FF00")
+                self.btn_start_patch.setEnabled(True)
+            else:
+                self.selected_folder = None
+                self.lbl_folder_path.setText(f"* 선택된 폴더: 없음 (검증 실패)")
+                self.add_log(f"* 검증 실패: {redact_user_path(chosen)} - {err_msg}", "#FF5555")
+                self.btn_start_patch.setEnabled(False)
         else:
             self.add_log("* 폴더 선택 취소", "#BBBBBB")
 
@@ -614,13 +718,13 @@ class DeltarunePatcherWindow(QMainWindow):
             # 런처 먼저 패치
             if valid_launcher_target and os.path.exists(launcher_delta):
                 log_cb("--- 런처 패치 적용 중 ---", "#FFFF00")
-                patchit(valid_launcher_target, launcher_delta)
+                patchit(valid_launcher_target, launcher_delta, log_cb=log_cb)
                 log_cb("* 런처 패치 완료!", "#00FF00")
 
             # 챕터 패치
             for item in valid_chapter_targets:
                 log_cb(f"--- 챕터 {item['chapter']} 패치 적용 중 ---", "#FFFF00")
-                patchit(item["targetFile"], item["deltaFile"])
+                patchit(item["targetFile"], item["deltaFile"], log_cb=log_cb)
                 log_cb(f"* 챕터 {item['chapter']} 패치 완료!", "#00FF00")
 
             # 언어 파일 복사

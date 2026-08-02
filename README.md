@@ -1,5 +1,5 @@
 # 현재 웹 기반 패처도 제작중입니다!
-# DELTARUNE KR Patcher (델타룬 한글 패처)
+# 델타룬 한글 패처
 최적화된 델타룬 한글 패쳐
 
 ---
@@ -64,11 +64,17 @@ python patcher.py
 ## 실행 파일 빌드
 
 PyInstaller를 이용해 Windows, Linux, macOS용 단일 실행 파일 및 앱 패키지를 생성할 수 있습니다.
+빌드 완료 시 UPX 압축 및 `.tar.xz` (Windows는 `.zip`) 형태로 배포 파일이 자동 생성됩니다.
 
-### 사전 준비 (PyInstaller 설치)
-```bash
-pip install pyinstaller PySide6 pyxdelta
-```
+### 사전 준비 (도구 및 패키지 설치)
+- **Python 패키지**:
+  ```bash
+  pip install pyinstaller PySide6 pyxdelta
+  ```
+- **빌드 및 압축 도구 (선택/권장)**:
+  - `upx`: 바이너리 실행 파일 용량 압축용
+  - `tar` / `xz` (`xz-utils`): 배포용 `.tar.xz` 아카이브 생성용
+  - `appimagetool`: Linux `.AppImage` 생성용 (선택)
 
 ### Windows (`.exe` 빌드)
 `build.bat` 스크립트를 실행합니다.

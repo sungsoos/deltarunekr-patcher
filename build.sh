@@ -25,6 +25,11 @@ if [ "$OS_NAME" = "Linux" ]; then
     # 1. PyInstaller build using spec file
     pyinstaller --noconfirm "$SCRIPT_DIR/DELTARUNE_KR_Patcher.spec"
 
+    if command -v upx &> /dev/null; then
+        echo "Compressing executable binary with UPX..."
+        upx --best "$SCRIPT_DIR/dist/DELTARUNE_KR_Patcher" 2>/dev/null || true
+    fi
+
     # 2. Build AppImage if appimagetool is available
     APP_DIR="$SCRIPT_DIR/dist/DELTARUNE_KR_Patcher.AppDir"
     mkdir -p "$APP_DIR/usr/bin"
@@ -58,6 +63,7 @@ EOF
 
     if command -v appimagetool &> /dev/null; then
         echo "Creating AppImage with appimagetool..."
+        rm -f "$SCRIPT_DIR/dist/DELTARUNE_KR_Patcher-x86_64.AppImage"
         appimagetool "$APP_DIR" "$SCRIPT_DIR/dist/DELTARUNE_KR_Patcher-x86_64.AppImage"
         echo "AppImage created: $SCRIPT_DIR/dist/DELTARUNE_KR_Patcher-x86_64.AppImage"
     else
@@ -66,6 +72,16 @@ EOF
         echo "(To package into .AppImage, install appimagetool and rerun this script)."
     fi
 
+    echo "--- Compressing Linux Release (.tar.xz) ---"
+    (cd "$SCRIPT_DIR/dist" && {
+        if [ -f "DELTARUNE_KR_Patcher-x86_64.AppImage" ]; then
+            tar -cJf "DELTARUNE_KR_Patcher_Linux.tar.xz" "DELTARUNE_KR_Patcher-x86_64.AppImage"
+        else
+            tar -cJf "DELTARUNE_KR_Patcher_Linux.tar.xz" "DELTARUNE_KR_Patcher"
+        fi
+    })
+    echo "Compressed release archive created at: $SCRIPT_DIR/dist/DELTARUNE_KR_Patcher_Linux.tar.xz"
+
 elif [ "$OS_NAME" = "Darwin" ]; then
     echo "--- Building macOS .app & Standalone Binary ---"
     
@@ -73,6 +89,10 @@ elif [ "$OS_NAME" = "Darwin" ]; then
         
     echo "macOS Application Bundle created at:"
     echo "  $SCRIPT_DIR/dist/DELTARUNE_KR_Patcher.app"
+
+    echo "--- Compressing macOS Release ---"
+    (cd "$SCRIPT_DIR/dist" && zip -9 -q -r "DELTARUNE_KR_Patcher_macOS.zip" "DELTARUNE_KR_Patcher.app")
+    echo "Compressed release archive created at: $SCRIPT_DIR/dist/DELTARUNE_KR_Patcher_macOS.zip"
 
 else
     echo "Unsupported OS: $OS_NAME for build.sh script."
