@@ -37,3 +37,5 @@ if %ERRORLEVEL% EQU 0 (
 echo.
 echo Build completed successfully!
 echo Executable generated at: %SCRIPT_DIR%dist\DELTARUNE_KR_Patcher.exe
+
+exit /b 0
