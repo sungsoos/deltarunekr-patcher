@@ -35,13 +35,13 @@ jobs:
       - name: 압축 (macOS App Bundle)
         run: |
           cd dist
-          zip -9 -r "DELTARUNE_KR_Patcher_macOS.zip" "DELTARUNE_KR_Patcher.app"
+          zip -9 -r "Patcher_macOS.zip" "Patcher.app"
 
       - name: 업로드
         uses: actions/upload-artifact@v4
         with:
           name: macOS
-          path: dist/DELTARUNE_KR_Patcher_macOS.zip
+          path: dist/Patcher_macOS.zip
 
   build-linux:
     name: Linux
@@ -79,8 +79,8 @@ jobs:
         with:
           name: Linux
           path: |
-            dist/DELTARUNE_KR_Patcher-x86_64.AppImage
-            dist/DELTARUNE_KR_Patcher
+            dist/Patcher.AppImage
+            dist/Patcher
 
   build-windows:
     name: Windows
@@ -110,4 +110,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: Windows
-          path: dist/DELTARUNE_KR_Patcher.exe
+          path: dist/Patcher.exe

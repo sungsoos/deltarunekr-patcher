@@ -31,11 +31,11 @@ if %ERRORLEVEL% NEQ 0 (
 where upx >nul 2>&1
 if %ERRORLEVEL% EQU 0 (
     echo Compressing executable with UPX...
-    upx "%SCRIPT_DIR%dist\DELTARUNE_KR_Patcher.exe" 2>nul
+    upx "%SCRIPT_DIR%dist\Patcher.exe" 2>nul
 )
 
 echo.
 echo Build completed successfully!
-echo Executable generated at: %SCRIPT_DIR%dist\DELTARUNE_KR_Patcher.exe
+echo Executable generated at: %SCRIPT_DIR%dist\Patcher.exe
 
 exit /b 0

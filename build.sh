@@ -27,24 +27,24 @@ if [ "$OS_NAME" = "Linux" ]; then
 
     if command -v upx &> /dev/null; then
         echo "Compressing executable binary with UPX..."
-        upx "$SCRIPT_DIR/dist/DELTARUNE_KR_Patcher" 2>/dev/null || true
+        upx "$SCRIPT_DIR/dist/Patcher" 2>/dev/null || true
     fi
 
     # 2. Build AppImage if appimagetool is available
-    APP_DIR="$SCRIPT_DIR/dist/DELTARUNE_KR_Patcher.AppDir"
+    APP_DIR="$SCRIPT_DIR/dist/Patcher.AppDir"
     mkdir -p "$APP_DIR/usr/bin"
-    cp "$SCRIPT_DIR/dist/DELTARUNE_KR_Patcher" "$APP_DIR/usr/bin/"
+    cp "$SCRIPT_DIR/dist/Patcher" "$APP_DIR/usr/bin/"
     
     cat << 'EOF' > "$APP_DIR/AppRun"
 #!/bin/sh
 HERE="$(dirname "$(readlink -f "${0}")")"
-exec "${HERE}/usr/bin/DELTARUNE_KR_Patcher" "$@"
+exec "${HERE}/usr/bin/Patcher" "$@"
 EOF
     chmod +x "$APP_DIR/AppRun"
 
-    cat << 'EOF' > "$APP_DIR/deltarune_kr_patcher.desktop"
+    cat << 'EOF' > "$APP_DIR/patcher.desktop"
 [Desktop Entry]
-Name=DELTARUNE KR Patcher
+Name=Patcher
 Exec=AppRun
 Icon=icon
 Type=Application
@@ -63,12 +63,12 @@ EOF
 
     if command -v appimagetool &> /dev/null; then
         echo "Creating AppImage with appimagetool..."
-        rm -f "$SCRIPT_DIR/dist/DELTARUNE_KR_Patcher-x86_64.AppImage"
-        appimagetool "$APP_DIR" "$SCRIPT_DIR/dist/DELTARUNE_KR_Patcher-x86_64.AppImage"
-        echo "AppImage created: $SCRIPT_DIR/dist/DELTARUNE_KR_Patcher-x86_64.AppImage"
+        rm -f "$SCRIPT_DIR/dist/Patcher.AppImage"
+        appimagetool "$APP_DIR" "$SCRIPT_DIR/dist/Patcher.AppImage"
+        echo "AppImage created: $SCRIPT_DIR/dist/Patcher.AppImage"
     else
         echo "Standalone single executable created at:"
-        echo "  $SCRIPT_DIR/dist/DELTARUNE_KR_Patcher"
+        echo "  $SCRIPT_DIR/dist/Patcher"
     fi
 
 elif [ "$OS_NAME" = "Darwin" ]; then
@@ -77,7 +77,7 @@ elif [ "$OS_NAME" = "Darwin" ]; then
     pyinstaller --noconfirm "$SCRIPT_DIR/DELTARUNE_KR_Patcher.spec"
         
     echo "macOS Application Bundle created at:"
-    echo "  $SCRIPT_DIR/dist/DELTARUNE_KR_Patcher.app"
+    echo "  $SCRIPT_DIR/dist/Patcher.app"
 
 else
     echo "Unsupported OS: $OS_NAME for build.sh script."

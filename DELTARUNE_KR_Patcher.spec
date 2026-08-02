@@ -110,7 +110,7 @@ if sys.platform == "darwin":
         a.scripts,
         [],
         exclude_binaries=True,
-        name='DELTARUNE_KR_Patcher',
+        name='Patcher',
         debug=False,
         bootloader_ignore_signals=False,
         strip=False,
@@ -130,11 +130,11 @@ if sys.platform == "darwin":
         strip=False,
         upx=True,
         upx_exclude=[],
-        name='DELTARUNE_KR_Patcher',
+        name='Patcher',
     )
     app = BUNDLE(
         coll,
-        name='DELTARUNE_KR_Patcher.app',
+        name='Patcher.app',
         icon=icon_arg,
         bundle_identifier=None,
     )
@@ -145,7 +145,7 @@ else:
         a.binaries,
         a.datas,
         [],
-        name='DELTARUNE_KR_Patcher',
+        name='Patcher',
         debug=False,
         bootloader_ignore_signals=False,
         strip=False,
