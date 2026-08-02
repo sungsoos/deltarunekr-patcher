@@ -2,3 +2,7 @@ build/
 orig/
 dist/
 __pycache__/
+
+# 패치 안에 lang, xdelta 넣기
+patch/*
+!patch/.gitkeep
