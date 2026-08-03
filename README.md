@@ -91,7 +91,7 @@ chmod  +x  build.sh
 ```text
 deltarunekr_patcher/
 ├── assets/ # UI 리소스 (폰트, 테두리 텍스처, 아이콘)
-│ ├── DeterminationSansK2.ttf
+│ ├── DeltaDotumKR.ttf
 │ ├── border_texture.png
 │ └── icon.ico
 ├── patch/ # 패치 파일 저장용 디렉터리
@@ -105,6 +105,6 @@ deltarunekr_patcher/
 ```
 
 ## 📜 라이선스 및 참고 사항 (Notice)
-- DeterminationSansK2는 [https://m.dcinside.com/board/game_nintendo/1476022](https://m.dcinside.com/board/game_nintendo/1476022)에서 가져왔습니다.
-- 패치 파일은 dtkrpatchteam이 제작한 파일을 사용하였습니다.
+- 델타돋움체: qhtjr1116 제작, 링크: [https://eocnd1116.github.io/qhtjrFont/index.html?type=1&n=0](https://eocnd1116.github.io/qhtjrFont/index.html?type=1&n=0)
+- 한국어 패치: dtkrpatchteam 제작, 링크: [https://www.deltarunekr.kro.kr/](https://www.deltarunekr.kro.kr/)
 - DELTARUNE의 원작권은 **Toby Fox**에게 있습니다.# 현재 웹 기반 패처도 제작중입니다!

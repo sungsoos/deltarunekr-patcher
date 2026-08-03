@@ -369,8 +369,8 @@ class DeltarunePatcherWindow(QMainWindow):
 
         self.setWindowFlags(Qt.FramelessWindowHint | Qt.Window)
         self.setAttribute(Qt.WA_TranslucentBackground, True)
-        self.setMinimumSize(500, 400)
-        self.resize(700, 600)
+        self.setMinimumSize(700, 500)
+        self.resize(950, 750)
         self.center_window()
 
         self.selected_folder = None
@@ -406,12 +406,12 @@ class DeltarunePatcherWindow(QMainWindow):
 
     def center_window(self):
         screen = QGuiApplication.primaryScreen().geometry()
-        x = (screen.width() - 700) // 2
-        y = (screen.height() - 600) // 2
+        x = (screen.width() - self.width()) // 2
+        y = (screen.height() - self.height()) // 2
         self.move(x, y)
 
     def load_custom_font(self):
-        font_path = resource_path("assets/DeterminationSansK2.ttf")
+        font_path = resource_path("assets/DeltaDotumKR.ttf")
         if os.path.exists(font_path):
             font_id = QFontDatabase.addApplicationFont(font_path)
             if font_id != -1:
@@ -449,7 +449,7 @@ class DeltarunePatcherWindow(QMainWindow):
                 color: #ffffff;
                 border: none;
                 font-family: "{font_fam}", "Courier New", monospace;
-                font-size: 20px;
+                font-size: 40px;
                 padding: 0px;
             }}
             QPushButton:hover:enabled {{
@@ -462,8 +462,9 @@ class DeltarunePatcherWindow(QMainWindow):
                 background-color: #050505;
                 border: 2px solid #ffffff;
                 font-family: "{font_fam}", "Courier New", monospace;
-                font-size: 16px;
+                font-size: 50px;
                 line-height: 1.3;
+                padding: 8px;
             }}
             QScrollBar:vertical {{
                 border: none;
@@ -491,12 +492,12 @@ class DeltarunePatcherWindow(QMainWindow):
         title_layout.setContentsMargins(0, 0, 0, 8)
 
         self.title_label = QLabel("DELTARUNE 한글 패처", self)
-        self.title_label.setStyleSheet("font-size: 26px; font-weight: normal; color: #ffffff;")
+        self.title_label.setStyleSheet("font-size: 45px; font-weight: normal; color: #ffffff;")
         title_layout.addWidget(self.title_label)
         title_layout.addStretch()
 
         self.btn_close_top = QPushButton("x", self)
-        self.btn_close_top.setStyleSheet("font-size: 26px; color: #ffffff; background: transparent;")
+        self.btn_close_top.setStyleSheet("font-size: 45px; color: #ffffff; background: transparent;")
         self.btn_close_top.setCursor(Qt.PointingHandCursor)
         self.btn_close_top.clicked.connect(self.close)
         title_layout.addWidget(self.btn_close_top)
@@ -521,7 +522,7 @@ class DeltarunePatcherWindow(QMainWindow):
         folder_layout.addWidget(self.btn_select_folder)
 
         self.lbl_folder_path = QLabel("* 선택된 폴더: 없음", self)
-        self.lbl_folder_path.setStyleSheet("font-size: 20px; color: #cccccc;")
+        self.lbl_folder_path.setStyleSheet("font-size: 35px; color: #cccccc;")
         self.lbl_folder_path.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
         folder_layout.addWidget(self.lbl_folder_path)
 
@@ -575,7 +576,7 @@ class DeltarunePatcherWindow(QMainWindow):
         return "..." + path_str[-(max_len - 3):]
 
     def add_log(self, msg: str, color: str = "#FFFFFF"):
-        html_msg = f'<div style="color: {color}; margin-bottom: 4px; font-family: \'{self.loaded_font_family}\', monospace; font-size: 16px;">{msg}</div>'
+        html_msg = f'<div style="color: {color}; margin-bottom: 4px; font-family: \'{self.loaded_font_family}\', monospace; font-size: 35px;">{msg}</div>'
         self.log_text.append(html_msg)
         sb = self.log_text.verticalScrollBar()
         sb.setValue(sb.maximum())
@@ -609,10 +610,10 @@ class DeltarunePatcherWindow(QMainWindow):
         if self.btn_start_patch.isEnabled() and not self.patching_in_progress:
             colors = ["#ff0000", "#ff7f00", "#ffff00", "#00ff00", "#0000ff", "#8b00ff"]
             col = colors[self.rainbow_phase % len(colors)]
-            self.btn_start_patch.setStyleSheet(f"QPushButton {{ color: {col}; font-size: 20px; font-family: '{font_fam}'; }} QPushButton:hover {{ color: #ffff00; }}")
+            self.btn_start_patch.setStyleSheet(f"QPushButton {{ color: {col}; font-size: 40px; font-family: '{font_fam}'; }} QPushButton:hover {{ color: #ffff00; }}")
             self.rainbow_phase += 1
         elif not self.btn_start_patch.isEnabled():
-            self.btn_start_patch.setStyleSheet(f"QPushButton {{ color: #555555; font-size: 20px; font-family: '{font_fam}'; }}")
+            self.btn_start_patch.setStyleSheet(f"QPushButton {{ color: #555555; font-size: 40px; font-family: '{font_fam}'; }}")
 
     def start_patch_thread(self):
         if not self.selected_folder or self.patching_in_progress:
