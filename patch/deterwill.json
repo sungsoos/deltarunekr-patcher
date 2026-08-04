@@ -1,0 +1,77 @@
+{
+    "1": {
+        "will": [
+            "obj_dummyenemy_slash_Step_0_gml_89_0"
+        ],
+        "determination": [],
+        "dess": [
+            "obj_readable_room1_slash_Other_10_gml_934_0",
+            "scr_text_slash_scr_text_gml_2613_0"
+        ]
+    },
+    "2": {
+        "will": [
+            "obj_dummyenemy_slash_Step_0_gml_89_0",
+            "obj_ch2_city08_slash_Step_0_gml_253_0",
+            "obj_ch2_scene10_slash_Step_0_gml_97_0",
+            "obj_ch2_scene26_slash_Step_0_gml_102_0",
+            "obj_ch2_scene26_slash_Step_0_gml_132_0",
+            "obj_ch2_scene27_slash_Step_0_gml_244_0",
+            "obj_ch2_scene25_slash_Step_0_gml_154_0",
+            "obj_gigaqueen_enemy_slash_Step_0_gml_107_0",
+            "obj_queen_enemy_slash_Step_0_gml_214_0"
+        ],
+        "determination": [
+            "obj_ch2_scene26_slash_Step_0_gml_133_0",
+            "obj_gigaqueen_enemy_slash_Step_0_gml_107_0"
+        ],
+        "dess": [
+            "obj_readable_room1_slash_Other_10_gml_736_0",
+            "scr_text_slash_scr_text_gml_2614_0",
+            "obj_ch2_city_noelle_monologue_slash_Step_0_gml_486_0"
+        ]
+    },
+    "3": {
+        "will": [
+            "obj_dummyenemy_slash_Step_0_gml_89_0"
+        ],
+        "determination": [],
+        "dess": [
+            "obj_readable_room1_slash_Other_10_gml_736_0",
+            "scr_text_slash_scr_text_gml_2614_0",
+            "obj_ch3_GSB02_slash_Step_0_gml_281_0"
+        ]
+    },
+    "4": {
+        "will": [
+            "obj_dummyenemy_slash_Step_0_gml_89_0"
+        ],
+        "determination": [],
+        "dess": [
+            "scr_text_slash_scr_text_gml_2614_0",
+            "obj_readable_room1_slash_Other_10_gml_1277_0_b",
+            "obj_readable_room1_slash_Other_10_gml_3484_0",
+            "obj_readable_room1_slash_Other_10_gml_3777_0",
+            "obj_readable_room1_slash_Other_10_gml_3779_0",
+            "obj_readable_room1_slash_Other_10_gml_3996_0"
+        ]
+    },
+    "5": {
+        "will": [
+            "obj_dummyenemy_slash_Step_0_gml_89_0",
+            "obj_shop1_slash_Draw_0_gml_487_0_b",
+            "obj_shop1_slash_Draw_0_gml_488_0_b"
+        ],
+        "determination": [],
+        "dess": [
+            "scr_text_slash_scr_text_gml_2614_0",
+            "obj_ch5_LW20W_slash_Step_0_gml_260_0",
+            "obj_room_krishallway_slash_Create_0_gml_9_0",
+            "obj_room_krishallway_slash_Create_0_gml_11_0",
+            "obj_room_krishallway_slash_Create_0_gml_12_0",
+            "obj_town_mid_ferris_slash_Step_0_gml_910_0",
+            "obj_town_mid_ferris_slash_Step_0_gml_912_0",
+            "obj_town_north_catty_house_slash_Step_0_gml_441_0"
+        ]
+    }
+}

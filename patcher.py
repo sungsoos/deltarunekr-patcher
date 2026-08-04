@@ -1,14 +1,21 @@
-from PySide6.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QTextEdit, QFileDialog, QFrame, QSizePolicy
-from PySide6.QtGui import QFontDatabase, QFont, QIcon, QGuiApplication, QPainter, QPixmap, QColor
-from PySide6.QtCore import Qt, QPoint, Signal, QObject, QTimer, QRect
+from PySide6.QtWidgets import (
+    QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel,
+    QPushButton, QTextEdit, QFileDialog, QFrame, QSizePolicy, QLineEdit,
+    QFormLayout, QDialog, QMessageBox
+)
+from PySide6.QtGui import QFontDatabase, QFont, QIcon, QGuiApplication, QPainter, QPixmap, QColor, QDesktopServices
+from PySide6.QtCore import Qt, QPoint, Signal, QObject, QTimer, QRect, QUrl
+import configparser
 import subprocess
 import threading
 import pyxdelta
 import getpass
 import shutil
+import json
 import sys
 import os
 import re
+
 
 
 def resource_path(relative_path: str) -> str:
@@ -297,6 +304,238 @@ def copy_folder(src_dir: str, dst_dir: str, log_cb):
             shutil.copyfile(src_path, dst_path)
             log_cb(f"  * 복사 완료: {os.path.basename(dst_path)}", "#88FF88")
 
+def adjust_josa(word: str, josa: str) -> str:
+    """한국어 조사 교정 (매우 안정된 핵)"""
+    if not word:
+        return word + josa
+    last_char = word[-1]
+    if not ("가" <= last_char <= "힣"):
+        return word + josa
+    jongseong_idx = (ord(last_char) - ord("가")) % 28
+    has_jongseong = jongseong_idx > 0
+    is_rieul = (jongseong_idx == 8)
+
+    if josa in ("을", "를"):
+        return word + ("을" if has_jongseong else "를")
+    elif josa in ("이", "가"):
+        return word + ("이" if has_jongseong else "가")
+    elif josa in ("은", "는"):
+        return word + ("은" if has_jongseong else "는")
+    elif josa in ("과", "와"):
+        return word + ("과" if has_jongseong else "와")
+    elif josa in ("으로", "로"):
+        if has_jongseong and not is_rieul:
+            return word + "으로"
+        return word + "로"
+
+    return word + josa
+
+def replace_word_with_josa(text: str, old_word: str, new_word: str) -> str:
+    """단어 치환 및 조사의 자동 교정 적용"""
+    safe_old_word = re.escape(old_word)
+    pattern = re.compile(rf"{safe_old_word}(을|를|이|가|은|는|으로|로|과|와)?")
+
+    def replacer(match):
+        matched_josa = match.group(1)
+        if matched_josa:
+            return adjust_josa(new_word, matched_josa)
+        return new_word
+
+    return pattern.sub(replacer, text)
+
+def update_true_config(log_cb=None):
+    """트루 콘픽 뭐시기 갱신"""
+    config_paths = []
+    if sys.platform == "win32":
+        local_app_data = os.getenv("LOCALAPPDATA")
+        if local_app_data:
+            config_paths.append(os.path.join(local_app_data, "DELTARUNE", "true_config.ini"))
+    elif sys.platform == "darwin":
+        home = os.path.expanduser("~")
+        config_paths.append(os.path.join(home, "Library", "Application Support", "com.tobyfox.deltarune", "true_config.ini"))
+        config_paths.append(os.path.join(home, "Library", "Application Support", "DELTARUNE", "true_config.ini"))
+    else:
+        home = os.path.expanduser("~")
+        config_paths.append(os.path.join(home, ".local", "share", "DELTARUNE", "true_config.ini"))
+        config_paths.append(os.path.join(home, ".config", "DELTARUNE", "true_config.ini"))
+
+    for config_path in config_paths:
+        try:
+            os.makedirs(os.path.dirname(config_path), exist_ok=True)
+            config = configparser.ConfigParser()
+            config.optionxform = str
+            if os.path.exists(config_path):
+                config.read(config_path, encoding="utf-8")
+
+            if not config.has_section("LANG"):
+                config.add_section("LANG")
+
+            config.set("LANG", "LANG", '"ja"')
+            config.set("LANG", "KRDUB", '"1"')
+
+            with open(config_path, "w", encoding="utf-8") as f:
+                config.write(f, space_around_delimiters=False)
+            if log_cb:
+                log_cb(f"* true_config.ini 설정 변경 완료 ({redact_user_path(config_path)})", "#88FF88")
+        except Exception as e:
+            if log_cb:
+                log_cb(f"* true_config.ini 설정 중 알림 (건너뜀): {e}", "#FFFF00")
+
+def apply_custom_words(target_dir: str, custom_words: dict, log_cb=None):
+    """사용자 지정 단어 (의지 / 결의 / 데스) 치환 및 조사 자동 수정"""
+    deterwill_path = resource_path("assets/deterwill.json")
+    if not os.path.exists(deterwill_path):
+        deterwill_path = resource_path("patch/deterwill.json")
+    if not os.path.exists(deterwill_path):
+        deterwill_path = resource_path("deterwill.json")
+
+    if not os.path.exists(deterwill_path):
+        if log_cb:
+            log_cb("* deterwill.json 치환 정의 파일을 찾을 수 없어 명칭 치환을 건너뜁니다.", "#FFFF00")
+        return
+
+    try:
+        with open(deterwill_path, "r", encoding="utf-8") as f:
+            deterwill = json.load(f)
+
+        default_map = {"determination": "의지", "will": "결의", "dess": "데스"}
+        is_mac = (sys.platform == "darwin")
+
+        for ch_num in range(1, 6):
+            ch_str = str(ch_num)
+            if ch_str not in deterwill:
+                continue
+
+            if is_mac:
+                folder_candidates = [f"chapter{ch_num}_mac", f"chapter{ch_num}_windows", f"chapter{ch_num}"]
+            else:
+                folder_candidates = [f"chapter{ch_num}_windows", f"chapter{ch_num}"]
+
+            lang_path = None
+            for fn in folder_candidates:
+                cand_lang = os.path.join(target_dir, fn, "lang", "lang_ja.json")
+                if os.path.exists(cand_lang):
+                    lang_path = cand_lang
+                    break
+
+            if not lang_path or not os.path.exists(lang_path):
+                continue
+
+            with open(lang_path, "r", encoding="utf-8") as f:
+                lang_data = json.load(f)
+
+            modified = False
+            for cat, old_word in default_map.items():
+                new_word = custom_words.get(cat, old_word)
+                if not new_word or new_word == old_word:
+                    continue
+
+                keys_to_change = deterwill[ch_str].get(cat, [])
+                for key in keys_to_change:
+                    if key in lang_data:
+                        original_text = lang_data[key]
+                        if isinstance(original_text, str):
+                            new_text = replace_word_with_josa(original_text, old_word, new_word)
+                            if original_text != new_text:
+                                lang_data[key] = new_text
+                                modified = True
+
+            if modified:
+                with open(lang_path, "w", encoding="utf-8") as f:
+                    json.dump(lang_data, f, ensure_ascii=False, indent=4)
+                if log_cb:
+                    log_cb(f"* 챕터 {ch_num} 사용자 정의 명칭 치환 적용 완료", "#00FF00")
+
+    except Exception as e:
+        if log_cb:
+            log_cb(f"* 명칭 치환 처리 중 오류: {e}", "#FF5555")
+
+def clean_tmp_files(target_dir: str):
+    """비정상 종료로 인한 잔여 파일(.tmp) 폭파"""
+    if not target_dir or not os.path.exists(target_dir):
+        return
+    tmp_candidates = [
+        os.path.join(target_dir, "data.win.tmp"),
+        os.path.join(target_dir, "game.ios.tmp"),
+    ]
+    for i in range(1, 6):
+        for fn in [f"chapter{i}_windows", f"chapter{i}_mac", f"chapter{i}"]:
+            tmp_candidates.append(os.path.join(target_dir, fn, "data.win.tmp"))
+            tmp_candidates.append(os.path.join(target_dir, fn, "game.ios.tmp"))
+            tmp_candidates.append(os.path.join(target_dir, fn, "lang", "lang_ja.json.tmp"))
+    for fpath in tmp_candidates:
+        if os.path.exists(fpath):
+            try:
+                os.remove(fpath)
+            except Exception:
+                pass
+
+class PatchFinishedDialog(QDialog):
+    """패치 완료 안내 및 게임 실행 팝업"""
+    def __init__(self, parent=None, font_family="Courier"):
+        super().__init__(parent)
+        self.setWindowTitle("패치 완료")
+        self.choice = None
+        self.setMinimumWidth(440)
+        self.setWindowFlags(Qt.Dialog | Qt.WindowTitleHint | Qt.CustomizeWindowHint)
+
+        stylesheet = f"""
+            QDialog {{
+                background-color: #050505;
+                border: 3px solid #ffffff;
+            }}
+            QLabel {{
+                color: #ffffff;
+                font-family: "{font_family}", monospace;
+                font-size: 28px;
+            }}
+            QPushButton {{
+                background-color: #000000;
+                color: #ffffff;
+                border: 2px solid #ffffff;
+                font-family: "{font_family}", monospace;
+                font-size: 26px;
+                padding: 8px 16px;
+            }}
+            QPushButton:hover {{
+                color: #ffff00;
+                border-color: #ffff00;
+            }}
+        """
+        self.setStyleSheet(stylesheet)
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(24, 24, 24, 24)
+        layout.setSpacing(16)
+
+        msg_label = QLabel("* 한글 패치를 성공적으로 마쳤습니다!\n* 지금 바로 델타룬을 실행할까요?", self)
+        msg_label.setAlignment(Qt.AlignCenter)
+        layout.addWidget(msg_label)
+
+        btn_steam = QPushButton("스팀을 통해 실행하기", self)
+        btn_steam.setCursor(Qt.PointingHandCursor)
+        btn_steam.clicked.connect(self.choose_steam)
+        layout.addWidget(btn_steam)
+
+        btn_direct = QPushButton("직접 실행하기", self)
+        btn_direct.setCursor(Qt.PointingHandCursor)
+        btn_direct.clicked.connect(self.choose_direct)
+        layout.addWidget(btn_direct)
+
+        btn_close = QPushButton("닫기", self)
+        btn_close.setCursor(Qt.PointingHandCursor)
+        btn_close.clicked.connect(self.reject)
+        layout.addWidget(btn_close)
+
+    def choose_steam(self):
+        self.choice = "steam"
+        self.accept()
+
+    def choose_direct(self):
+        self.choice = "direct"
+        self.accept()
+
+
 class SlicedWidget(QWidget):
     """9조각 창 렌더링을 위한 클래스"""
     def __init__(self, parent=None, texture_path=None, border_slice=15, border_width=45):
@@ -419,6 +658,11 @@ class DeltarunePatcherWindow(QMainWindow):
                 if families:
                     self.loaded_font_family = families[0]
 
+        custom_font = QFont(self.loaded_font_family)
+        custom_font.setStyleStrategy(QFont.PreferAntialias)
+        custom_font.setHintingPreference(QFont.PreferFullHinting)
+        QApplication.setFont(custom_font)
+
     def setup_ui(self):
         assets_dir = get_assets_dir()
         border_img_path = os.path.join(assets_dir, "border_texture.png")
@@ -528,6 +772,33 @@ class DeltarunePatcherWindow(QMainWindow):
 
         main_layout.addWidget(folder_section)
 
+        # 고급 설정 입력 폼
+        self.adv_widget = QWidget(self)
+        adv_layout = QFormLayout(self.adv_widget)
+        adv_layout.setContentsMargins(10, 4, 10, 4)
+        adv_layout.setSpacing(8)
+
+        lbl_det = QLabel("determination (기본: 의지):", self)
+        lbl_det.setStyleSheet("font-size: 28px; color: #ffffff;")
+        self.input_determination = QLineEdit("의지", self)
+        self.input_determination.setStyleSheet("font-size: 28px; background-color: #050505; border: 2px solid #ffffff; color: #ffff00; padding: 2px 6px;")
+        adv_layout.addRow(lbl_det, self.input_determination)
+
+        lbl_will = QLabel("will (기본: 결의):", self)
+        lbl_will.setStyleSheet("font-size: 28px; color: #ffffff;")
+        self.input_will = QLineEdit("결의", self)
+        self.input_will.setStyleSheet("font-size: 28px; background-color: #050505; border: 2px solid #ffffff; color: #ffff00; padding: 2px 6px;")
+        adv_layout.addRow(lbl_will, self.input_will)
+
+        lbl_dess = QLabel("dess (기본: 데스):", self)
+        lbl_dess.setStyleSheet("font-size: 28px; color: #ffffff;")
+        self.input_dess = QLineEdit("데스", self)
+        self.input_dess.setStyleSheet("font-size: 28px; background-color: #050505; border: 2px solid #ffffff; color: #ffff00; padding: 2px 6px;")
+        adv_layout.addRow(lbl_dess, self.input_dess)
+
+        self.adv_widget.setVisible(False)
+        main_layout.addWidget(self.adv_widget)
+
         # 로그
         self.log_text = QTextEdit(self)
         self.log_text.setReadOnly(True)
@@ -542,6 +813,13 @@ class DeltarunePatcherWindow(QMainWindow):
         self.btn_close_bot.setCursor(Qt.PointingHandCursor)
         self.btn_close_bot.clicked.connect(self.close)
         footer_layout.addWidget(self.btn_close_bot)
+
+        footer_layout.addSpacing(16)
+
+        self.btn_toggle_adv = QPushButton("고급 설정 열기", self)
+        self.btn_toggle_adv.setCursor(Qt.PointingHandCursor)
+        self.btn_toggle_adv.clicked.connect(self.toggle_advanced_settings)
+        footer_layout.addWidget(self.btn_toggle_adv)
 
         footer_layout.addStretch()
 
@@ -559,6 +837,14 @@ class DeltarunePatcherWindow(QMainWindow):
         footer_layout.addWidget(self.btn_start_patch)
 
         main_layout.addWidget(footer)
+
+    def toggle_advanced_settings(self):
+        is_vis = not self.adv_widget.isVisible()
+        self.adv_widget.setVisible(is_vis)
+        if is_vis:
+            self.btn_toggle_adv.setText("고급 설정 닫기")
+        else:
+            self.btn_toggle_adv.setText("고급 설정 열기")
 
     def mousePressEvent(self, event):
         if event.button() == Qt.LeftButton:
@@ -622,10 +908,17 @@ class DeltarunePatcherWindow(QMainWindow):
         self.btn_start_patch.setEnabled(False)
         self.btn_select_folder.setEnabled(False)
 
-        t = threading.Thread(target=self.run_patch_process, daemon=True)
+        custom_words = {
+            "enabled": self.adv_widget.isVisible(),
+            "determination": self.input_determination.text().strip() or "의지",
+            "will": self.input_will.text().strip() or "결의",
+            "dess": self.input_dess.text().strip() or "데스",
+        }
+
+        t = threading.Thread(target=self.run_patch_process, args=(custom_words,), daemon=True)
         t.start()
 
-    def run_patch_process(self):
+    def run_patch_process(self, custom_words=None):
         target_dir = self.selected_folder
         patch_dir = resource_path("patch")
         xdelta_dir = os.path.join(patch_dir, "xdelta")
@@ -640,6 +933,9 @@ class DeltarunePatcherWindow(QMainWindow):
             log_cb(f"* 오류: {err}", "#FF5555")
             self.bridge.finish_signal.emit(False)
             return
+
+        # 잔여 .tmp 임시 파일 자동 정리
+        clean_tmp_files(target_dir)
 
         try:
             is_mac = (sys.platform == "darwin")
@@ -735,6 +1031,15 @@ class DeltarunePatcherWindow(QMainWindow):
                     shutil.copyfile(s_path, d_path)
                     log_cb(f"  * 복사 완료: {item}", "#88FF88")
 
+            # 사용자 정의 명칭 치환 (고급 설정)
+            if custom_words and (custom_words.get("enabled") or custom_words.get("determination") != "의지" or custom_words.get("will") != "결의" or custom_words.get("dess") != "데스"):
+                log_cb("--- 고급 설정 (사용자 정의 명칭 치환) 적용 중 ---", "#FFFF00")
+                apply_custom_words(target_dir, custom_words, log_cb=log_cb)
+
+            # 게임 설정 파일 (true_config.ini) 갱신
+            log_cb("--- 게임 설정 (true_config.ini) 최신화 중 ---", "#FFFF00")
+            update_true_config(log_cb=log_cb)
+
             log_cb("--- 패치가 성공적으로 완료되었습니다! ---", "#00FF00")
             log_cb("* 한글 패치가 성공적으로 완료되었습니다!", "#00FF00")
             self.bridge.finish_signal.emit(True)
@@ -747,6 +1052,28 @@ class DeltarunePatcherWindow(QMainWindow):
         self.patching_in_progress = False
         self.btn_select_folder.setEnabled(True)
         self.btn_start_patch.setEnabled(True)
+        self.btn_start_patch.setText("패치 적용")
+
+
+        if success:
+            dialog = PatchFinishedDialog(self, font_family=self.loaded_font_family)
+            if dialog.exec() == QDialog.Accepted:
+                if dialog.choice == "steam":
+                    QDesktopServices.openUrl(QUrl("steam://rungameid/1671210"))
+                elif dialog.choice == "direct" and self.selected_folder:
+                    if sys.platform == "win32":
+                        exe_path = os.path.join(self.selected_folder, "DELTARUNE.exe")
+                        if os.path.exists(exe_path):
+                            subprocess.Popen([exe_path], cwd=self.selected_folder)
+                    elif sys.platform == "darwin":
+                        app_path = os.path.join(self.selected_folder, "DELTARUNE.app")
+                        if os.path.exists(app_path):
+                            subprocess.Popen(["open", app_path])
+                    else:
+                        exe_path = os.path.join(self.selected_folder, "DELTARUNE")
+                        if os.path.exists(exe_path):
+                            subprocess.Popen([exe_path], cwd=self.selected_folder)
+
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
