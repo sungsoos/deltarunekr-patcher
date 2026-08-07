@@ -1,6 +1,6 @@
 # 델타룬 한글 패처
 최적화된 델타룬 한글 패처
-> 웹 버전 패처: [https://dtkr.sungsoos.kr](https://dtkr.usngsoos.kr)
+> 웹 버전 패처: [https://dtkr.sungsoos.kr](https://dtkr.sungsoos.kr/)
 
 ## 실행 및 사용 방법
 
