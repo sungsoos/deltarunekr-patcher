@@ -2,40 +2,31 @@
 chcp 65001 >nul
 setlocal enabledelayedexpansion
 
-echo ========================================================
-echo Building DELTARUNE KR Patcher Windows Executable (.exe)
-echo ========================================================
-
-where pyinstaller >nul 2>&1
-if %ERRORLEVEL% NEQ 0 (
-    echo Error: PyInstaller is not installed or not in PATH!
-    echo Please install PyInstaller via: pip install pyinstaller
-    exit /b 1
-)
+echo ===============
+echo 패처 빌드 중...
+echo ===============
 
 set "SCRIPT_DIR=%~dp0"
-set "ASSETS_DIR=%SCRIPT_DIR%orig\src\assets"
+set "DIST_DIR=%SCRIPT_DIR%dist"
+set "RELEASE_DIR=%SCRIPT_DIR%target\release"
 
-if not exist "%ASSETS_DIR%" (
-    set "ASSETS_DIR=%SCRIPT_DIR%assets"
-)
-
-echo Using assets directory: %ASSETS_DIR%
-
-pyinstaller --noconfirm "%SCRIPT_DIR%DELTARUNE_KR_Patcher.spec"
+echo === cargo로 빌드 ===
+cargo build --release
 if %ERRORLEVEL% NEQ 0 (
-    echo Build failed during PyInstaller execution.
+    echo 오류: Cargo 빌드 실패!
     exit /b %ERRORLEVEL%
 )
 
-where upx >nul 2>&1
-if %ERRORLEVEL% EQU 0 (
-    echo Compressing executable with UPX...
-    upx "%SCRIPT_DIR%dist\Patcher.exe" 2>nul
+if exist "%DIST_DIR%" rd /s /q "%DIST_DIR%"
+mkdir "%DIST_DIR%"
+
+echo === 파일 복사 중 ===
+copy "%RELEASE_DIR%\deltarunekr_patcher.exe" "%DIST_DIR%\Windows-Patcher.exe" >nul
+if %ERRORLEVEL% NEQ 0 (
+    echo 오류: .exe 복사 실패!
+    exit /b %ERRORLEVEL%
 )
 
 echo.
-echo Build completed successfully!
-echo Executable generated at: %SCRIPT_DIR%dist\Patcher.exe
-
+echo 빌드 성공!
 exit /b 0

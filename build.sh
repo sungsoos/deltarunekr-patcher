@@ -2,87 +2,104 @@
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-ASSETS_DIR="$SCRIPT_DIR/orig/src/assets"
-if [ ! -d "$ASSETS_DIR" ]; then
-    ASSETS_DIR="$SCRIPT_DIR/assets"
-fi
+DIST_DIR="${SCRIPT_DIR}/dist"
+RELEASE_DIR="${SCRIPT_DIR}/target/release"
 
-echo "========================================================"
-echo " Building DELTARUNE KR Patcher (AppImage & .app)"
-echo "========================================================"
+echo "=== cargo로 빌드 중... ==="
+cargo build --release
 
-if ! command -v pyinstaller &> /dev/null; then
-    echo "Error: PyInstaller is not installed!"
-    echo "Install via: pip install pyinstaller"
-    exit 1
-fi
+rm -rf "${DIST_DIR}"
+mkdir -p "${DIST_DIR}"
 
 OS_NAME="$(uname -s)"
 
-if [ "$OS_NAME" = "Linux" ]; then
-    echo "--- Building Linux Onefile Binary & AppImage ---"
-    
-    # 1. PyInstaller build using spec file
-    pyinstaller --noconfirm "$SCRIPT_DIR/DELTARUNE_KR_Patcher.spec"
+case "${OS_NAME}" in
+    Linux*)
+        echo "=== 바이너리 복사 중 ==="
+        cp "${RELEASE_DIR}/deltarunekr_patcher" "${DIST_DIR}/Linux-Patcher-bin"
+        chmod +x "${DIST_DIR}/Linux-Patcher-bin"
+        echo "[+] 리눅스 바이너리 복사됨: ${DIST_DIR}/Linux-Patcher-bin"
 
-    if command -v upx &> /dev/null; then
-        echo "Compressing executable binary with UPX..."
-        upx "$SCRIPT_DIR/dist/Patcher" 2>/dev/null || true
-    fi
+        echo "=== AppImage 생성 중 ==="
+        if command -v appimagetool >/dev/null 2>&1; then
+            APPDIR="${DIST_DIR}/AppDir"
+            mkdir -p "${APPDIR}/usr/bin"
+            mkdir -p "${APPDIR}/usr/share/icons/hicolor/256x256/apps"
 
-    # 2. Build AppImage if appimagetool is available
-    APP_DIR="$SCRIPT_DIR/dist/Patcher.AppDir"
-    mkdir -p "$APP_DIR/usr/bin"
-    cp "$SCRIPT_DIR/dist/Patcher" "$APP_DIR/usr/bin/"
-    
-    cat << 'EOF' > "$APP_DIR/AppRun"
+            cp "${RELEASE_DIR}/deltarunekr_patcher" "${APPDIR}/usr/bin/"
+            cp -r "${SCRIPT_DIR}/patch" "${APPDIR}/usr/bin/"
+            cp -r "${SCRIPT_DIR}/assets" "${APPDIR}/usr/bin/"
+            cp "${SCRIPT_DIR}/assets/icon.png" "${APPDIR}/usr/share/icons/hicolor/256x256/apps/deltarunekr_patcher.png"
+            cp "${SCRIPT_DIR}/assets/icon.png" "${APPDIR}/deltarunekr_patcher.png"
+
+            cat <<EOF > "${APPDIR}/deltarunekr_patcher.desktop"
+[Desktop Entry]
+Name=델타룬 한국어 패처
+Exec=deltarunekr_patcher
+Icon=deltarunekr_patcher
+Type=Application
+Categories=Game;Utility;
+Comment=델타룬 한국어 패처
+EOF
+
+            cat <<'EOF' > "${APPDIR}/AppRun"
 #!/bin/sh
 HERE="$(dirname "$(readlink -f "${0}")")"
-exec "${HERE}/usr/bin/Patcher" "$@"
+export PATH="${HERE}/usr/bin:${PATH}"
+exec "${HERE}/usr/bin/deltarunekr_patcher" "$@"
 EOF
-    chmod +x "$APP_DIR/AppRun"
+            chmod +x "${APPDIR}/AppRun"
 
-    cat << 'EOF' > "$APP_DIR/patcher.desktop"
-[Desktop Entry]
-Name=Patcher
-Exec=AppRun
-Icon=icon
-Type=Application
-Categories=Game;
-EOF
-
-    if [ -f "$ASSETS_DIR/icon.png" ]; then
-        cp "$ASSETS_DIR/icon.png" "$APP_DIR/icon.png"
-        cp "$ASSETS_DIR/icon.png" "$APP_DIR/.DirIcon"
-    elif [ -f "$ASSETS_DIR/icon.ico" ]; then
-        python3 -c "from PySide6.QtGui import QImage; img = QImage('$ASSETS_DIR/icon.ico'); img.save('$APP_DIR/icon.png')" 2>/dev/null || cp "$ASSETS_DIR/icon.ico" "$APP_DIR/icon.ico"
-        if [ -f "$APP_DIR/icon.png" ]; then
-            cp "$APP_DIR/icon.png" "$APP_DIR/.DirIcon"
+            ARCH=x86_64 appimagetool "${APPDIR}" "${DIST_DIR}/Linux-Patcher.AppImage"
+            rm -rf "${APPDIR}"
+            echo "[+] AppImage 생성됨: ${DIST_DIR}/Linux-Patcher.AppImage"
+        else
+            echo "[-] 경고: appimagetool이 없습니다. AppImage 빌드 건너뜀."
         fi
-    fi
+        ;;
 
-    if command -v appimagetool &> /dev/null; then
-        echo "Creating AppImage with appimagetool..."
-        rm -f "$SCRIPT_DIR/dist/Patcher.AppImage"
-        appimagetool "$APP_DIR" "$SCRIPT_DIR/dist/Patcher.AppImage"
-        echo "AppImage created: $SCRIPT_DIR/dist/Patcher.AppImage"
-    else
-        echo "Standalone single executable created at:"
-        echo "  $SCRIPT_DIR/dist/Patcher"
-    fi
+    Darwin*)
+        echo "=== .app 번들 생성 중 ==="
+        APP_BUNDLE="${DIST_DIR}/MacOS-Patcher.app"
+        mkdir -p "${APP_BUNDLE}/Contents/MacOS"
+        mkdir -p "${APP_BUNDLE}/Contents/Resources"
 
-elif [ "$OS_NAME" = "Darwin" ]; then
-    echo "--- Building macOS .app & Standalone Binary ---"
-    
-    pyinstaller --noconfirm "$SCRIPT_DIR/DELTARUNE_KR_Patcher.spec"
-        
-    echo "macOS Application Bundle created at:"
-    echo "  $SCRIPT_DIR/dist/Patcher.app"
+        cp "${RELEASE_DIR}/deltarunekr_patcher" "${APP_BUNDLE}/Contents/MacOS/"
+        cp -r "${SCRIPT_DIR}/patch" "${APP_BUNDLE}/Contents/MacOS/"
+        cp -r "${SCRIPT_DIR}/assets" "${APP_BUNDLE}/Contents/MacOS/"
+        if [ -f "${SCRIPT_DIR}/assets/icon.icns" ]; then
+            cp "${SCRIPT_DIR}/assets/icon.icns" "${APP_BUNDLE}/Contents/Resources/AppIcon.icns"
+        fi
 
-else
-    echo "Unsupported OS: $OS_NAME for build.sh script."
-fi
+        cat <<EOF > "${APP_BUNDLE}/Contents/Info.plist"
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleExecutable</key>
+    <string>deltarunekr_patcher</string>
+    <key>CFBundleIconFile</key>
+    <string>AppIcon</string>
+    <key>CFBundleIdentifier</key>
+    <string>kr.deltarune.patcher</string>
+    <key>CFBundleName</key>
+    <string>델타룬 한국어 패처</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>CFBundleShortVersionString</key>
+    <string>0.1.0</string>
+</dict>
+</plist>
+EOF
+        echo "[+] macOS .app 번들 생성됨: ${APP_BUNDLE}"
+        ;;
 
-echo "========================================================"
-echo " Build process finished."
-echo "========================================================"
+    *)
+        echo "[!] 지원되지 않는 플랫폼: ${OS_NAME}"
+        ;;
+esac
+
+echo ""
+echo "=== 빌드 성공 ==="
+echo "${DIST_DIR}에 생성됨"
+ls -lh "${DIST_DIR}"

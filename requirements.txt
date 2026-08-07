@@ -1,4 +1,0 @@
-PySide6
-pyxdelta
-pyinstaller
-Pillow

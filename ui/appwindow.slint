@@ -1,0 +1,447 @@
+import { Button, ScrollView, TextEdit, LineEdit } from "std-widgets.slint";
+
+import "../assets/DeltaDotumKR.ttf";
+
+export struct LogItem {
+    msg: string,
+    color: color,
+}
+
+export component MainWindow inherits Window {
+    title: "DELTARUNE 한글 패처";
+    default-font-family: "DeltaDotumKR";
+    background: transparent;
+    no-frame: true;
+    min-width: 700px;
+    min-height: 500px;
+    preferred-width: 950px;
+    preferred-height: 750px;
+
+    in-out property <string> folder-path: "* 선택된 폴더: 없음";
+    in-out property <bool> adv-open: false;
+    in-out property <string> custom-det: "의지";
+    in-out property <string> custom-will: "결의";
+    in-out property <string> custom-dess: "데스";
+    in-out property <[LogItem]> logs: [];
+    in-out property <string> log-text: "";
+    in-out property <color> patch-button-color: #555555;
+    in-out property <bool> patch-enabled: false;
+    in-out property <bool> show-finished-modal: false;
+
+    callback select-folder();
+    callback toggle-advanced();
+    callback copy-log();
+    callback start-patch();
+    callback launch-steam();
+    callback launch-direct();
+    callback close-modal();
+    callback close-window();
+    callback drag-window();
+    callback scroll-to-bottom();
+
+    scroll-to-bottom => {
+        if (log-scroll.viewport-height > log-scroll.height) {
+            log-scroll.viewport-y = log-scroll.height - log-scroll.viewport-height;
+        }
+    }
+
+    // 9개로 조각이 나버린 보더
+    Image {
+        width: 100%;
+        height: 100%;
+        source: @image-url("../assets/borderthing.png", nine-slice(60 60 60 60));
+    }
+
+    // 메인
+    VerticalLayout {
+        padding-left: 65px;
+        padding-right: 65px;
+        padding-top: 65px;
+        padding-bottom: 65px;
+        spacing: 16px;
+
+        // 타이틀바
+        HorizontalLayout {
+            padding-bottom: 8px;
+            alignment: space-between;
+
+            TouchArea {
+                width: 80%;
+                moved => { root.drag-window(); }
+                HorizontalLayout {
+                    alignment: start;
+                    Text {
+                        text: "DELTARUNE 한글 패처";
+                        font-family: "DeltaDotumKR";
+                        font-size: 45px;
+                        font-weight: 400;
+                        color: #ffffff;
+                        horizontal-alignment: left;
+                        vertical-alignment: center;
+                    }
+                }
+            }
+
+            Rectangle {
+                width: 45px;
+                height: 45px;
+                ta-close := TouchArea {
+                    mouse-cursor: pointer;
+                    clicked => { root.close-window(); }
+                }
+                Text {
+                    text: "x";
+                    font-family: "DeltaDotumKR";
+                    font-size: 45px;
+                    color: ta-close.has-hover ? #ffff00 : #ffffff;
+                    horizontal-alignment: center;
+                    vertical-alignment: center;
+                }
+            }
+        }
+
+        // <hr>
+        Rectangle {
+            height: 2px;
+            background: #444444;
+        }
+
+        // 폴더 그룹
+        HorizontalLayout {
+            spacing: 16px;
+            alignment: start;
+
+            ta-folder := TouchArea {
+                mouse-cursor: pointer;
+                clicked => { root.select-folder(); }
+                Text {
+                    text: "폴더 선택";
+                    font-family: "DeltaDotumKR";
+                    font-size: 40px;
+                    color: ta-folder.has-hover ? #ffff00 : #ffffff;
+                    vertical-alignment: center;
+                }
+            }
+
+            Text {
+                text: root.folder-path;
+                font-family: "DeltaDotumKR";
+                font-size: 35px;
+                color: #cccccc;
+                vertical-alignment: center;
+                overflow: elide;
+            }
+        }
+
+        // 고급 옵선
+        if root.adv-open : VerticalLayout {
+            spacing: 8px;
+            padding-left: 10px;
+            padding-right: 10px;
+            padding-top: 4px;
+            padding-bottom: 4px;
+
+            HorizontalLayout {
+                spacing: 8px;
+                Text {
+                    text: "determination (기본: 의지):";
+                    font-family: "DeltaDotumKR";
+                    font-size: 28px;
+                    color: #ffffff;
+                    vertical-alignment: center;
+                }
+                Rectangle {
+                    width: 200px;
+                    height: 38px;
+                    background: #050505;
+                    border-width: 2px;
+                    border-color: input-det.has-focus ? #ffff00 : #ffffff;
+                    clip: true;
+                    HorizontalLayout {
+                        padding-left: 6px;
+                        padding-right: 6px;
+                        input-det := TextInput {
+                            text <=> root.custom-det;
+                            font-family: "DeltaDotumKR";
+                            font-size: 28px;
+                            color: input-det.has-focus ? #ffff00 : #ffffff;
+                            selection-background-color: #ffff00;
+                            selection-foreground-color: #000000;
+                            single-line: true;
+                            vertical-alignment: center;
+                            width: 100%;
+                            height: 100%;
+                        }
+                    }
+                }
+            }
+
+            HorizontalLayout {
+                spacing: 8px;
+                Text {
+                    text: "will (기본: 결의):";
+                    font-family: "DeltaDotumKR";
+                    font-size: 28px;
+                    color: #ffffff;
+                    vertical-alignment: center;
+                }
+                Rectangle {
+                    width: 200px;
+                    height: 38px;
+                    background: #050505;
+                    border-width: 2px;
+                    border-color: input-will.has-focus ? #ffff00 : #ffffff;
+                    clip: true;
+                    HorizontalLayout {
+                        padding-left: 6px;
+                        padding-right: 6px;
+                        input-will := TextInput {
+                            text <=> root.custom-will;
+                            font-family: "DeltaDotumKR";
+                            font-size: 28px;
+                            color: input-will.has-focus ? #ffff00 : #ffffff;
+                            selection-background-color: #ffff00;
+                            selection-foreground-color: #000000;
+                            single-line: true;
+                            vertical-alignment: center;
+                            width: 100%;
+                            height: 100%;
+                        }
+                    }
+                }
+            }
+
+            HorizontalLayout {
+                spacing: 8px;
+                Text {
+                    text: "dess (기본: 데스):";
+                    font-family: "DeltaDotumKR";
+                    font-size: 28px;
+                    color: #ffffff;
+                    vertical-alignment: center;
+                }
+                Rectangle {
+                    width: 200px;
+                    height: 38px;
+                    background: #050505;
+                    border-width: 2px;
+                    border-color: input-dess.has-focus ? #ffff00 : #ffffff;
+                    clip: true;
+                    HorizontalLayout {
+                        padding-left: 6px;
+                        padding-right: 6px;
+                        input-dess := TextInput {
+                            text <=> root.custom-dess;
+                            font-family: "DeltaDotumKR";
+                            font-size: 28px;
+                            color: input-dess.has-focus ? #ffff00 : #ffffff;
+                            selection-background-color: #ffff00;
+                            selection-foreground-color: #000000;
+                            single-line: true;
+                            vertical-alignment: center;
+                            width: 100%;
+                            height: 100%;
+                        }
+                    }
+                }
+            }
+        }
+
+        // 로그
+        Rectangle {
+            background: #050505;
+            border-width: 2px;
+            border-color: #ffffff;
+
+            log-scroll := ScrollView {
+                width: 100%;
+                height: 100%;
+                VerticalLayout {
+                    padding: 8px;
+                    alignment: start;
+                    spacing: 4px;
+                    for item in root.logs : Text {
+                        text: item.msg;
+                        color: item.color;
+                        font-family: "DeltaDotumKR";
+                        font-size: 35px;
+                        wrap: word-wrap;
+                    }
+                }
+            }
+        }
+
+        // 아래 버튼
+        HorizontalLayout {
+            height: 45px;
+            alignment: space-between;
+
+            // 닫기 + 고급 옵션
+            HorizontalLayout {
+                spacing: 16px;
+
+                ta-close-bot := TouchArea {
+                    mouse-cursor: pointer;
+                    clicked => { root.close-window(); }
+                    Text {
+                        text: "닫기";
+                        font-family: "DeltaDotumKR";
+                        font-size: 40px;
+                        color: ta-close-bot.has-hover ? #ffff00 : #ffffff;
+                        vertical-alignment: center;
+                    }
+                }
+
+                ta-adv := TouchArea {
+                    mouse-cursor: pointer;
+                    clicked => { root.toggle-advanced(); }
+                    Text {
+                        text: root.adv-open ? "고급 설정 닫기" : "고급 설정 열기";
+                        font-family: "DeltaDotumKR";
+                        font-size: 40px;
+                        color: ta-adv.has-hover ? #ffff00 : #ffffff;
+                        vertical-alignment: center;
+                    }
+                }
+            }
+
+            // 로그 복사 + 패치 시작
+            HorizontalLayout {
+                spacing: 16px;
+
+                ta-copy := TouchArea {
+                    mouse-cursor: pointer;
+                    clicked => { root.copy-log(); }
+                    Text {
+                        text: "로그 복사";
+                        font-family: "DeltaDotumKR";
+                        font-size: 40px;
+                        color: ta-copy.has-hover ? #ffff00 : #ffffff;
+                        vertical-alignment: center;
+                    }
+                }
+
+                ta-start := TouchArea {
+                    mouse-cursor: root.patch-enabled ? pointer : default;
+                    clicked => {
+                        if (root.patch-enabled) {
+                            root.start-patch();
+                        }
+                    }
+                    Text {
+                        text: "패치 적용";
+                        font-family: "DeltaDotumKR";
+                        font-size: 40px;
+                        color: root.patch-enabled ? (ta-start.has-hover ? #ffff00 : root.patch-button-color) : #555555;
+                        vertical-alignment: center;
+                    }
+                }
+            }
+        }
+    }
+}
+
+// 패치 완료
+export component PatchFinishedWindow inherits Window {
+    title: "패치 완료";
+    default-font-family: "DeltaDotumKR";
+    background: transparent;
+    no-frame: true;
+    width: 480px;
+    height: 320px;
+
+    callback launch-steam();
+    callback launch-direct();
+    callback close-modal();
+
+    // 보더 / 컨테이너
+    Rectangle {
+        width: 100%;
+        height: 100%;
+        background: #050505;
+        border-width: 3px;
+        border-color: #ffffff;
+
+        VerticalLayout {
+            padding-left: 24px;
+            padding-right: 24px;
+            padding-top: 24px;
+            padding-bottom: 24px;
+            spacing: 16px;
+            alignment: center;
+
+            Text {
+                text: "* 한글 패치를 성공적으로 마쳤습니다!\n* 지금 바로 델타룬을 실행할까요?";
+                font-family: "DeltaDotumKR";
+                font-size: 28px;
+                color: #ffffff;
+                horizontal-alignment: center;
+            }
+
+            Rectangle {
+                width: 380px;
+                height: 52px;
+                background: #000000;
+                border-width: 2px;
+                border-color: ta-dlg-steam.has-hover ? #ffff00 : #ffffff;
+                ta-dlg-steam := TouchArea {
+                    mouse-cursor: pointer;
+                    clicked => { root.launch-steam(); }
+                }
+                Text {
+                    text: "스팀을 통해 실행하기";
+                    font-family: "DeltaDotumKR";
+                    font-size: 26px;
+                    color: ta-dlg-steam.has-hover ? #ffff00 : #ffffff;
+                    horizontal-alignment: center;
+                    vertical-alignment: center;
+                }
+            }
+
+            Rectangle {
+                width: 380px;
+                height: 52px;
+                background: #000000;
+                border-width: 2px;
+                border-color: ta-dlg-direct.has-hover ? #ffff00 : #ffffff;
+                ta-dlg-direct := TouchArea {
+                    mouse-cursor: pointer;
+                    clicked => { root.launch-direct(); }
+                }
+                Text {
+                    text: "직접 실행하기";
+                    font-family: "DeltaDotumKR";
+                    font-size: 26px;
+                    color: ta-dlg-direct.has-hover ? #ffff00 : #ffffff;
+                    horizontal-alignment: center;
+                    vertical-alignment: center;
+                }
+            }
+
+            Rectangle {
+                width: 380px;
+                height: 48px;
+                background: #000000;
+                border-width: 2px;
+                border-color: ta-dlg-close.has-hover ? #ffff00 : #ffffff;
+                ta-dlg-close := TouchArea {
+                    mouse-cursor: pointer;
+                    clicked => { root.close-modal(); }
+                }
+                Text {
+                    text: "닫기";
+                    font-family: "DeltaDotumKR";
+                    font-size: 26px;
+                    color: ta-dlg-close.has-hover ? #ffff00 : #ffffff;
+                    horizontal-alignment: center;
+                    vertical-alignment: center;
+                }
+            }
+        }
+    }
+}
+
+
+
+
+
