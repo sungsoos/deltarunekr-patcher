@@ -4,7 +4,7 @@
 ## 실행 및 사용 방법
 
 ### 1. 미리 빌드된 프로그램 실행
-1.  [여기서](http://git.sungsoos.kr/sungsoos/deltarunekr_patcher/releases/latest) 최신 버전은 다운로드 받으세요.
+1.  [여기서](http://git.sungsoos.kr/sungsoos/deltarunekr_patcher/releases/latest) 최신 버전을 다운로드 받으세요.
 2. 실행하세요.
 > Windows Server 2025, MacOS 15, Ubuntu 24.04에서 빌드되었습니다 (Github Actions)
 
