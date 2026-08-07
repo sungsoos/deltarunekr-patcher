@@ -1,5 +1,6 @@
 # 델타룬 한글 패처
 최적화된 델타룬 한글 패처
+> 웹 버전 패처: [https://dtkr.sungsoos.kr](https://dtkr.usngsoos.kr)
 
 ## 실행 및 사용 방법
 
@@ -120,4 +121,4 @@ deltarunekr_patcher/
 ## 📜 라이선스 및 참고 사항 (Notice)
 - 델타돋움체: qhtjr1116 제작, 링크: [https://eocnd1116.github.io/qhtjrFont/index.html?type=1&n=0](https://eocnd1116.github.io/qhtjrFont/index.html?type=1&n=0)
 - 한국어 패치: dtkrpatchteam 제작, 링크: [https://www.deltarunekr.kro.kr/](https://www.deltarunekr.kro.kr/)
-- DELTARUNE의 원작권은 **Toby Fox**에게 있습니다.# 현재 웹 기반 패처도 제작중입니다!
+- DELTARUNE의 원작권은 **Toby Fox**에게 있습니다.
