@@ -20,42 +20,6 @@ case "${OS_NAME}" in
         chmod +x "${DIST_DIR}/Linux-Patcher-bin"
         echo "[+] 리눅스 바이너리 복사됨: ${DIST_DIR}/Linux-Patcher-bin"
 
-        echo "=== AppImage 생성 중 ==="
-        if command -v appimagetool >/dev/null 2>&1; then
-            APPDIR="${DIST_DIR}/AppDir"
-            mkdir -p "${APPDIR}/usr/bin"
-            mkdir -p "${APPDIR}/usr/share/icons/hicolor/256x256/apps"
-
-            cp "${RELEASE_DIR}/deltarunekr_patcher" "${APPDIR}/usr/bin/"
-            cp -r "${SCRIPT_DIR}/patch" "${APPDIR}/usr/bin/"
-            cp -r "${SCRIPT_DIR}/assets" "${APPDIR}/usr/bin/"
-            cp "${SCRIPT_DIR}/assets/icon.png" "${APPDIR}/usr/share/icons/hicolor/256x256/apps/deltarunekr_patcher.png"
-            cp "${SCRIPT_DIR}/assets/icon.png" "${APPDIR}/deltarunekr_patcher.png"
-
-            cat <<EOF > "${APPDIR}/deltarunekr_patcher.desktop"
-[Desktop Entry]
-Name=델타룬 한국어 패처
-Exec=deltarunekr_patcher
-Icon=deltarunekr_patcher
-Type=Application
-Categories=Game;Utility;
-Comment=델타룬 한국어 패처
-EOF
-
-            cat <<'EOF' > "${APPDIR}/AppRun"
-#!/bin/sh
-HERE="$(dirname "$(readlink -f "${0}")")"
-export PATH="${HERE}/usr/bin:${PATH}"
-exec "${HERE}/usr/bin/deltarunekr_patcher" "$@"
-EOF
-            chmod +x "${APPDIR}/AppRun"
-
-            ARCH=x86_64 appimagetool "${APPDIR}" "${DIST_DIR}/Linux-Patcher.AppImage"
-            rm -rf "${APPDIR}"
-            echo "[+] AppImage 생성됨: ${DIST_DIR}/Linux-Patcher.AppImage"
-        else
-            echo "[-] 경고: appimagetool이 없습니다. AppImage 빌드 건너뜀."
-        fi
         ;;
 
     Darwin*)
