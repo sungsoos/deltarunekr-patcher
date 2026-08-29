@@ -32,9 +32,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: Linux-Packages
-          path: |
-            dist/Linux-Patcher.AppImage
-            dist/Linux-Patcher-bin
+          path: dist/Linux-Patcher-bin
 
   build-macos:
     name: macOS
