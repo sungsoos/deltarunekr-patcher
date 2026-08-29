@@ -22,8 +22,6 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y libfuse2 desktop-file-utils build-essential pkg-config libx11-dev libxcb1-dev libxcursor-dev libxinerama-dev libxi-dev libxrandr-dev libfontconfig1-dev
-          sudo wget https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage -O /usr/local/bin/appimagetool
-          sudo chmod +x /usr/local/bin/appimagetool
 
       - name: 빌드
         run: |
