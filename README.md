@@ -37,7 +37,7 @@ patch/
 ## 요구 사항
 ### 미리 빌드된 파일을 실행할 시
 - 수정되지 않은 델타룬 게임
-- Windows 10+ 혹은 MacOS 15+ (테스트 필요) 혹은 AppImage를 실행할 수 있는 Linux 배포판
+- Windows 10+ 혹은 MacOS 15+ (테스트 필요) 혹은 Linux 배포판
 ### 소스코드 실행 시
 - **Rust**: 1.75 이상 (stable)
 - `cargo`가 설치되어 있어야 합니다. ([rustup.rs](https://rustup.rs) 에서 설치)
@@ -64,11 +64,6 @@ sudo apt-get install build-essential pkg-config libx11-dev libxcb1-dev libxcurso
 sudo apt-get install build-essential pkg-config libx11-dev libxcb1-dev libxcursor-dev libxinerama-dev libxi-dev libxrandr-dev libfontconfig1-dev libfuse2 desktop-file-utils
 ```
 > *다른 배포판의 경우는 알아서 찾아 보시길...*
-- **Linux AppImage 생성 시 추가**:
-```bash
-sudo wget https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage -O /usr/local/bin/appimagetool
-sudo chmod +x /usr/local/bin/appimagetool
-```
 
 ### Windows (`.exe` 빌드)
 ```cmd
@@ -81,7 +76,7 @@ build.bat
 chmod +x build.sh
 ./build_all.sh
 ```
-- 빌드 결과물: `dist/Linux-Patcher-bin`, `dist/Linux-Patcher.AppImage`
+- 빌드 결과물: `dist/Linux-Patcher-bin`
 
 ### macOS (`.app` 번들 빌드)
 ```bash
