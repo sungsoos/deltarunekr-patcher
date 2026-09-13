@@ -29,8 +29,25 @@ case "${OS_NAME}" in
         mkdir -p "${APP_BUNDLE}/Contents/Resources"
 
         cp "${RELEASE_DIR}/deltarunekr_patcher" "${APP_BUNDLE}/Contents/MacOS/"
-        cp -r "${SCRIPT_DIR}/patch" "${APP_BUNDLE}/Contents/MacOS/"
+
+        # macOS 패치 파일만 복사 (용량 최적화)
+        mkdir -p "${APP_BUNDLE}/Contents/MacOS/patch"
+        if [ -f "${SCRIPT_DIR}/patch/deterwill.json" ]; then
+            cp "${SCRIPT_DIR}/patch/deterwill.json" "${APP_BUNDLE}/Contents/MacOS/patch/"
+        fi
+        if [ -d "${SCRIPT_DIR}/patch/lang_mac" ]; then
+            cp -r "${SCRIPT_DIR}/patch/lang_mac" "${APP_BUNDLE}/Contents/MacOS/patch/"
+        fi
+        if [ -d "${SCRIPT_DIR}/patch/xdelta_mac" ]; then
+            cp -r "${SCRIPT_DIR}/patch/xdelta_mac" "${APP_BUNDLE}/Contents/MacOS/patch/"
+        fi
+
+        # assets 복사 및 타 플랫폼 바이너리 제거
         cp -r "${SCRIPT_DIR}/assets" "${APP_BUNDLE}/Contents/MacOS/"
+        rm -f "${APP_BUNDLE}/Contents/MacOS/assets/bin/xdelta3_win.exe" "${APP_BUNDLE}/Contents/MacOS/assets/bin/xdelta3_linux"
+        chmod +x "${APP_BUNDLE}/Contents/MacOS/assets/bin/xdelta3_mac" 2>/dev/null || true
+        chmod +x "${APP_BUNDLE}/Contents/MacOS/deltarunekr_patcher"
+
         if [ -f "${SCRIPT_DIR}/assets/icon.icns" ]; then
             cp "${SCRIPT_DIR}/assets/icon.icns" "${APP_BUNDLE}/Contents/Resources/AppIcon.icns"
         fi
