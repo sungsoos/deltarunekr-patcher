@@ -36,7 +36,6 @@ fn main() {
             let _ = std::fs::copy(&deterwill, target_patch.join("deterwill.json"));
         }
 
-        let profile = env::var("PROFILE").unwrap_or_default();
         if is_mac {
             // macOS: mac 패치만 복사
             let lang_mac = patch_src.join("lang_mac");
@@ -49,8 +48,8 @@ fn main() {
             }
             let _ = std::fs::remove_dir_all(target_patch.join("lang"));
             let _ = std::fs::remove_dir_all(target_patch.join("xdelta"));
-        } else if profile == "release" {
-            // Windows/Linux release: 일반 패치만 복사
+        } else {
+            // Windows/Linux: 일반 패치만 복사 (macOS 패치 제외)
             let lang = patch_src.join("lang");
             if lang.exists() {
                 let _ = fs_extra::dir::copy(&lang, &target_patch, &options);
@@ -61,9 +60,6 @@ fn main() {
             }
             let _ = std::fs::remove_dir_all(target_patch.join("lang_mac"));
             let _ = std::fs::remove_dir_all(target_patch.join("xdelta_mac"));
-        } else {
-            // Debug 빌드: 로컬 개발 및 테스트를 위해 모든 패치 유지
-            let _ = fs_extra::dir::copy(&patch_src, target_dir, &options);
         }
     }
     if assets_src.exists() {
