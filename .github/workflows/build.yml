@@ -57,7 +57,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: MacOS-Package
-          path: dist/MacOS-Patcher.app
+          path: |
+            dist/MacOS-Patcher-bin
+            dist/MacOS-Patcher.app
 
   build-windows:
     name: Windows

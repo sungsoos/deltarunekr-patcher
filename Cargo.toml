@@ -25,5 +25,7 @@ vcdiff-decoder = "1.0"
 winreg = "0.52"
 
 [profile.release]
-lto = "thin"
+opt-level = "z"
+lto = true
+codegen-units = 1
 strip = true
