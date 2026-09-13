@@ -28,5 +28,5 @@ if %ERRORLEVEL% NEQ 0 (
 )
 
 echo.
-echo 빌드 성공!
+echo 단일 실행 파일 빌드 성공: %DIST_DIR%\Windows-Patcher.exe
 exit /b 0

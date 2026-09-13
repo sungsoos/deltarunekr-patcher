@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::collections::HashMap;
 use std::fs::{self, File};
 use std::io::{BufRead, BufReader};
@@ -14,11 +15,189 @@ use slint::{Color, Model, ModelRc, SharedString, VecModel};
 
 slint::include_modules!();
 
+// -- 내장 패치 데이터 (압축 해제 없이 메모리에서 직접 사용) --
+
+#[cfg(target_os = "macos")]
+mod embedded_patch {
+    pub static DETERWILL: &str = include_str!("../patch/deterwill.json");
+
+    pub static LAUNCHER_XDELTA: &[u8] = include_bytes!("../patch/xdelta_mac/launcher.xdelta");
+    pub static CH1_XDELTA: &[u8] = include_bytes!("../patch/xdelta_mac/ch1.xdelta");
+    pub static CH2_XDELTA: &[u8] = include_bytes!("../patch/xdelta_mac/ch2.xdelta");
+    pub static CH3_XDELTA: &[u8] = include_bytes!("../patch/xdelta_mac/ch3.xdelta");
+    pub static CH4_XDELTA: &[u8] = include_bytes!("../patch/xdelta_mac/ch4.xdelta");
+    pub static CH5_XDELTA: &[u8] = include_bytes!("../patch/xdelta_mac/ch5.xdelta");
+
+    pub static CH1_LANG_JA: &str = include_str!("../patch/lang_mac/chapter1_mac/lang/lang_ja.json");
+    pub static CH2_LANG_JA: &str = include_str!("../patch/lang_mac/chapter2_mac/lang/lang_ja.json");
+    pub static CH3_LANG_JA: &str = include_str!("../patch/lang_mac/chapter3_mac/lang/lang_ja.json");
+    pub static CH3_VID_TENNA: &[u8] = include_bytes!("../patch/lang_mac/chapter3_mac/vid/tennaIntroF1_compressed_28.mp4");
+    pub static CH3_VID_TENNA_KR: &[u8] = include_bytes!("../patch/lang_mac/chapter3_mac/vid/tennaIntroKRf1_compressed_28.mp4");
+    pub static CH4_LANG_JA: &str = include_str!("../patch/lang_mac/chapter4_mac/lang/lang_ja.json");
+    pub static CH5_LANG_JA: &str = include_str!("../patch/lang_mac/chapter5_mac/lang/lang_ja.json");
+    pub static CH5_VID_INTRO: &[u8] = include_bytes!("../patch/lang_mac/chapter5_mac/vid/ch5_intro_jp.mp4");
+}
+
+#[cfg(not(target_os = "macos"))]
+mod embedded_patch {
+    pub static DETERWILL: &str = include_str!("../patch/deterwill.json");
+
+    pub static LAUNCHER_XDELTA: &[u8] = include_bytes!("../patch/xdelta/launcher.xdelta");
+    pub static CH1_XDELTA: &[u8] = include_bytes!("../patch/xdelta/ch1.xdelta");
+    pub static CH2_XDELTA: &[u8] = include_bytes!("../patch/xdelta/ch2.xdelta");
+    pub static CH3_XDELTA: &[u8] = include_bytes!("../patch/xdelta/ch3.xdelta");
+    pub static CH4_XDELTA: &[u8] = include_bytes!("../patch/xdelta/ch4.xdelta");
+    pub static CH5_XDELTA: &[u8] = include_bytes!("../patch/xdelta/ch5.xdelta");
+
+    pub static CH1_LANG_JA: &str = include_str!("../patch/lang/chapter1_windows/lang/lang_ja.json");
+    pub static CH2_LANG_JA: &str = include_str!("../patch/lang/chapter2_windows/lang/lang_ja.json");
+    pub static CH3_LANG_JA: &str = include_str!("../patch/lang/chapter3_windows/lang/lang_ja.json");
+    pub static CH3_VID_TENNA: &[u8] = include_bytes!("../patch/lang/chapter3_windows/vid/tennaIntroF1_compressed_28.mp4");
+    pub static CH3_VID_TENNA_KR: &[u8] = include_bytes!("../patch/lang/chapter3_windows/vid/tennaIntroKRf1_compressed_28.mp4");
+    pub static CH4_LANG_JA: &str = include_str!("../patch/lang/chapter4_windows/lang/lang_ja.json");
+    pub static CH5_LANG_JA: &str = include_str!("../patch/lang/chapter5_windows/lang/lang_ja.json");
+    pub static CH5_VID_INTRO: &[u8] = include_bytes!("../patch/lang/chapter5_windows/vid/ch5_intro_jp.mp4");
+}
+
+fn get_xdelta_data(ch: usize) -> Option<Cow<'static, [u8]>> {
+    let is_mac = cfg!(target_os = "macos");
+    let folder = if is_mac { "xdelta_mac" } else { "xdelta" };
+    let filename = if ch == 0 {
+        "launcher.xdelta".to_string()
+    } else {
+        format!("ch{}.xdelta", ch)
+    };
+    let disk_file = resource_path(format!("patch/{}/{}", folder, filename));
+    if disk_file.exists() {
+        if let Ok(data) = fs::read(&disk_file) {
+            return Some(Cow::Owned(data));
+        }
+    }
+
+    match ch {
+        0 => Some(Cow::Borrowed(embedded_patch::LAUNCHER_XDELTA)),
+        1 => Some(Cow::Borrowed(embedded_patch::CH1_XDELTA)),
+        2 => Some(Cow::Borrowed(embedded_patch::CH2_XDELTA)),
+        3 => Some(Cow::Borrowed(embedded_patch::CH3_XDELTA)),
+        4 => Some(Cow::Borrowed(embedded_patch::CH4_XDELTA)),
+        5 => Some(Cow::Borrowed(embedded_patch::CH5_XDELTA)),
+        _ => None,
+    }
+}
+
+fn get_chapter_lang_ja(ch: usize) -> Option<Cow<'static, str>> {
+    let is_mac = cfg!(target_os = "macos");
+    let lang_folder = if is_mac { "lang_mac" } else { "lang" };
+    let ch_sub = if is_mac {
+        format!("chapter{}_mac", ch)
+    } else {
+        format!("chapter{}_windows", ch)
+    };
+    let disk_file = resource_path(format!("patch/{}/{}/lang/lang_ja.json", lang_folder, ch_sub));
+    if disk_file.exists() {
+        if let Ok(content) = fs::read_to_string(&disk_file) {
+            return Some(Cow::Owned(content));
+        }
+    }
+
+    match ch {
+        1 => Some(Cow::Borrowed(embedded_patch::CH1_LANG_JA)),
+        2 => Some(Cow::Borrowed(embedded_patch::CH2_LANG_JA)),
+        3 => Some(Cow::Borrowed(embedded_patch::CH3_LANG_JA)),
+        4 => Some(Cow::Borrowed(embedded_patch::CH4_LANG_JA)),
+        5 => Some(Cow::Borrowed(embedded_patch::CH5_LANG_JA)),
+        _ => None,
+    }
+}
+
+fn get_deterwill_content() -> Cow<'static, str> {
+    let p = resource_path("assets/deterwill.json");
+    if p.exists() {
+        if let Ok(c) = fs::read_to_string(&p) {
+            return Cow::Owned(c);
+        }
+    }
+    let p2 = resource_path("patch/deterwill.json");
+    if p2.exists() {
+        if let Ok(c) = fs::read_to_string(&p2) {
+            return Cow::Owned(c);
+        }
+    }
+    Cow::Borrowed(embedded_patch::DETERWILL)
+}
+
+fn deploy_chapter_assets<F>(ch_num: usize, dst_chapter_dir: &Path, log_cb: &F) -> Result<(), String>
+where
+    F: Fn(String, &'static str),
+{
+    let is_mac = cfg!(target_os = "macos");
+    let lang_folder = if is_mac { "lang_mac" } else { "lang" };
+    let ch_sub = if is_mac {
+        format!("chapter{}_mac", ch_num)
+    } else {
+        format!("chapter{}_windows", ch_num)
+    };
+    let disk_src = resource_path(format!("patch/{}/{}", lang_folder, ch_sub));
+
+    if disk_src.exists() {
+        copy_folder(&disk_src, dst_chapter_dir, log_cb)?;
+        return Ok(());
+    }
+
+    // 디스크에 별도 폴더가 없는 경우 내장 리소스를 게임 디렉터리에 직접 복사
+    let lang_dir = dst_chapter_dir.join("lang");
+    fs::create_dir_all(&lang_dir).map_err(|e| format!("폴더 생성 실패 ({:?}): {}", lang_dir, e))?;
+
+    if let Some(lang_content) = get_chapter_lang_ja(ch_num) {
+        let lang_file = lang_dir.join("lang_ja.json");
+        fs::write(&lang_file, lang_content.as_bytes())
+            .map_err(|e| format!("언어 파일 작성 실패 ({:?}): {}", lang_file, e))?;
+    }
+
+    if ch_num == 3 {
+        let vid_dir = dst_chapter_dir.join("vid");
+        fs::create_dir_all(&vid_dir).map_err(|e| format!("폴더 생성 실패 ({:?}): {}", vid_dir, e))?;
+        fs::write(
+            vid_dir.join("tennaIntroF1_compressed_28.mp4"),
+            embedded_patch::CH3_VID_TENNA,
+        )
+        .map_err(|e| format!("비디오 복사 실패: {}", e))?;
+        fs::write(
+            vid_dir.join("tennaIntroKRf1_compressed_28.mp4"),
+            embedded_patch::CH3_VID_TENNA_KR,
+        )
+        .map_err(|e| format!("비디오 복사 실패: {}", e))?;
+    } else if ch_num == 5 {
+        let vid_dir = dst_chapter_dir.join("vid");
+        fs::create_dir_all(&vid_dir).map_err(|e| format!("폴더 생성 실패 ({:?}): {}", vid_dir, e))?;
+        fs::write(
+            vid_dir.join("ch5_intro_jp.mp4"),
+            embedded_patch::CH5_VID_INTRO,
+        )
+        .map_err(|e| format!("비디오 복사 실패: {}", e))?;
+    }
+
+    Ok(())
+}
+
 fn resource_path<P: AsRef<Path>>(relative_path: P) -> PathBuf {
     let rel = relative_path.as_ref();
 
     if let Ok(exe_path) = std::env::current_exe() {
         if let Some(exe_dir) = exe_path.parent() {
+            let direct = exe_dir.join(rel);
+            if direct.exists() {
+                return direct;
+            }
+
+            // macOS .app bundle Contents/Resources 지원
+            if let Some(contents) = exe_dir.parent() {
+                let res_cand = contents.join("Resources").join(rel);
+                if res_cand.exists() {
+                    return res_cand;
+                }
+            }
+
             let mut curr = exe_dir.to_path_buf();
             for _ in 0..6 {
                 let cand = curr.join(rel);
@@ -347,23 +526,17 @@ fn get_xdelta3_binary() -> Option<PathBuf> {
     None
 }
 
-fn patchit(target_file: &Path, delta_file: &Path) -> Result<(), String> {
+fn patchit(target_file: &Path, delta_bytes: &[u8], delta_name: &str) -> Result<(), String> {
     let clean_target = redact_user_path(&target_file.to_string_lossy());
-    let clean_delta = redact_user_path(&delta_file.to_string_lossy());
 
     if !target_file.exists() {
         return Err(format!("패치할 파일이 존재하지 않습니다: {}", clean_target));
     }
-    if !delta_file.exists() {
-        return Err(format!("델타 파일이 존재하지 않습니다: {}", clean_delta));
+    if delta_bytes.is_empty() {
+        return Err(format!("델타 패치 데이터가 비어있습니다: {}", delta_name));
     }
 
-    let delta_size = fs::metadata(delta_file).map(|m| m.len()).unwrap_or(0);
     let target_size = fs::metadata(target_file).map(|m| m.len()).unwrap_or(0);
-
-    if delta_size == 0 {
-        return Err(format!("패치 파일이 비어있습니다 (0 byte): {}", clean_delta));
-    }
     if target_size == 0 {
         return Err(format!("대상 파일이 비어있습니다 (0 byte): {}", clean_target));
     }
@@ -379,34 +552,40 @@ fn patchit(target_file: &Path, delta_file: &Path) -> Result<(), String> {
 
     let mut patched_ok = false;
 
+    // 1. xdelta3 CLI 시도
     let xdelta3_bin = get_xdelta3_binary();
     if let Some(ref bin) = xdelta3_bin {
-        let output = StdCommand::new(bin)
-            .args([
-                "-d",
-                "-f",
-                "-s",
-                target_file.to_str().unwrap_or_default(),
-                delta_file.to_str().unwrap_or_default(),
-                tmp_file.to_str().unwrap_or_default(),
-            ])
-            .output();
+        let delta_tmp = std::env::temp_dir().join(format!("xdelta_tmp_{}", delta_name));
+        if fs::write(&delta_tmp, delta_bytes).is_ok() {
+            let output = StdCommand::new(bin)
+                .args([
+                    "-d",
+                    "-f",
+                    "-s",
+                    target_file.to_str().unwrap_or_default(),
+                    delta_tmp.to_str().unwrap_or_default(),
+                    tmp_file.to_str().unwrap_or_default(),
+                ])
+                .output();
+            let _ = fs::remove_file(&delta_tmp);
 
-        if let Ok(out) = output {
-            if out.status.success()
-                && tmp_file.exists()
-                && fs::metadata(&tmp_file).map(|m| m.len()).unwrap_or(0) > 0
-            {
-                patched_ok = true;
+            if let Ok(out) = output {
+                if out.status.success()
+                    && tmp_file.exists()
+                    && fs::metadata(&tmp_file).map(|m| m.len()).unwrap_or(0) > 0
+                {
+                    patched_ok = true;
+                }
             }
         }
     }
 
+    // 2. 내장 vcdiff-decoder 사용 (메모리에서 바로 디코딩)
     if !patched_ok {
         let res = std::panic::catch_unwind(|| {
-            if let (Ok(patch_bytes), Ok(delta_bytes)) = (fs::read(target_file), fs::read(delta_file)) {
+            if let Ok(target_bytes) = fs::read(target_file) {
                 let mut delta_cursor = std::io::Cursor::new(delta_bytes);
-                let mut patch_cursor = std::io::Cursor::new(patch_bytes);
+                let mut patch_cursor = std::io::Cursor::new(target_bytes.as_slice());
                 let mut out_buf = Vec::new();
 
                 if vcdiff_decoder::apply_patch(&mut delta_cursor, Some(&mut patch_cursor), &mut out_buf).is_ok() {
@@ -605,33 +784,7 @@ fn apply_custom_words<F>(target_dir: &Path, custom_words: &CustomWords, log_cb: 
 where
     F: Fn(String, &'static str),
 {
-    let deterwill_path = resource_path("assets/deterwill.json");
-    let deterwill_path = if deterwill_path.exists() {
-        deterwill_path
-    } else {
-        resource_path("patch/deterwill.json")
-    };
-    let deterwill_path = if deterwill_path.exists() {
-        deterwill_path
-    } else {
-        resource_path("deterwill.json")
-    };
-
-    if !deterwill_path.exists() {
-        log_cb(
-            "* deterwill.json 치환 정의 파일을 찾을 수 없어 명칭 치환을 건너뜁니다.".to_string(),
-            "#FFFF00",
-        );
-        return;
-    }
-
-    let file_content = match fs::read_to_string(&deterwill_path) {
-        Ok(c) => c,
-        Err(e) => {
-            log_cb(format!("* 명칭 치환 파일 읽기 실패: {}", e), "#FF5555");
-            return;
-        }
-    };
+    let file_content = get_deterwill_content();
 
     let deterwill: Value = match serde_json::from_str(&file_content) {
         Ok(v) => v,
@@ -1041,25 +1194,11 @@ fn main() -> Result<(), slint::PlatformError> {
 
                 clean_tmp_files(&folder);
 
-                let patch_dir = resource_path("patch");
                 let is_mac = cfg!(target_os = "macos");
 
-                let xdelta_folder = if is_mac {
-                    "xdelta_mac"
-                } else {
-                    "xdelta"
-                };
-                let xdelta_dir = patch_dir.join(xdelta_folder);
-
-                let lang_folder = if is_mac {
-                    "lang_mac"
-                } else {
-                    "lang"
-                };
-                let lang_src = patch_dir.join(lang_folder);
-
-                let launcher_delta = xdelta_dir.join("launcher.xdelta");
-                let valid_launcher_target = if launcher_delta.exists() {
+                // 런처 패치 확인 (메모리 내장 데이터 또는 로컬 파일)
+                let launcher_delta = get_xdelta_data(0);
+                let valid_launcher_target = if launcher_delta.is_some() {
                     let target = find_launcher_data_file(&folder, is_mac);
                     if target.is_none() {
                         let expected = if is_mac { "game.ios" } else { "data.win" };
@@ -1073,14 +1212,13 @@ fn main() -> Result<(), slint::PlatformError> {
 
                 let mut valid_chapter_targets = Vec::new();
                 for i in 1..=5 {
-                    let delta = xdelta_dir.join(format!("ch{}.xdelta", i));
-                    if !delta.exists() {
-                        on_error(format!(
-                            "* 검증 실패: 챕터 {} 패치 파일({}/ch{}.xdelta)이 존재하지 않습니다.",
-                            i, xdelta_folder, i
-                        ));
-                        return;
-                    }
+                    let delta = match get_xdelta_data(i) {
+                        Some(d) => d,
+                        None => {
+                            on_error(format!("* 검증 실패: 챕터 {} 패치 데이터를 찾을 수 없습니다.", i));
+                            return;
+                        }
+                    };
 
                     let folder_candidates = if is_mac {
                         vec![
@@ -1122,18 +1260,10 @@ fn main() -> Result<(), slint::PlatformError> {
                     valid_chapter_targets.push((i, found_target, delta));
                 }
 
-                if !lang_src.exists() {
-                    on_error(format!(
-                        "* 검증 실패: 패처에서 언어 폴더(./patch/{})를 찾을 수 없습니다.",
-                        lang_folder
-                    ));
-                    return;
-                }
-
                 if let Some(target) = valid_launcher_target {
-                    if launcher_delta.exists() {
+                    if let Some(ref delta) = launcher_delta {
                         log_cb("--- 런처 패치 적용 중 ---".to_string(), "#FFFF00");
-                        if let Err(e) = patchit(&target, &launcher_delta) {
+                        if let Err(e) = patchit(&target, delta, "launcher.xdelta") {
                             on_error(format!("* 오류: {}", e));
                             return;
                         }
@@ -1141,19 +1271,19 @@ fn main() -> Result<(), slint::PlatformError> {
                     }
                 }
 
-                for (ch_num, target_file, delta_file) in &valid_chapter_targets {
+                for (ch_num, target_file, delta) in &valid_chapter_targets {
                     log_cb(
                         format!("--- 챕터 {} 패치 적용 중 ---", ch_num),
                         "#FFFF00",
                     );
-                    if let Err(e) = patchit(target_file, delta_file) {
+                    if let Err(e) = patchit(target_file, delta, &format!("ch{}.xdelta", ch_num)) {
                         on_error(format!("* 오류: {}", e));
                         return;
                     }
                     log_cb(format!("* 챕터 {} 패치 완료!", ch_num), "#00FF00");
                 }
 
-                log_cb("--- 언어 파일 복사 중 ---".to_string(), "#FFFF00");
+                log_cb("--- 언어 파일 및 리소스 복사 중 ---".to_string(), "#FFFF00");
                 for (ch_num, _, _) in &valid_chapter_targets {
                     let dst_chapter_dir = if is_mac {
                         folder.join(format!("chapter{}_mac", ch_num))
@@ -1161,33 +1291,9 @@ fn main() -> Result<(), slint::PlatformError> {
                         folder.join(format!("chapter{}_windows", ch_num))
                     };
 
-                    let src_ch_dir = if is_mac {
-                        lang_src.join(format!("chapter{}_mac", ch_num))
-                    } else {
-                        lang_src.join(format!("chapter{}_windows", ch_num))
-                    };
-
-                    if src_ch_dir.exists() {
-                        if let Err(e) = copy_folder(&src_ch_dir, &dst_chapter_dir, &log_cb) {
-                            on_error(format!("* 언어 복사 오류: {}", e));
-                            return;
-                        }
-                    }
-                }
-
-                if let Ok(entries) = fs::read_dir(&lang_src) {
-                    for entry in entries.flatten() {
-                        let p = entry.path();
-                        let fname = entry.file_name();
-                        let fname_str = fname.to_string_lossy();
-                        if !fname_str.starts_with("chapter") {
-                            let dst = folder.join(&fname);
-                            if p.is_dir() {
-                                let _ = copy_folder(&p, &dst, &log_cb);
-                            } else {
-                                let _ = fs::copy(&p, &dst);
-                            }
-                        }
+                    if let Err(e) = deploy_chapter_assets(*ch_num, &dst_chapter_dir, &log_cb) {
+                        on_error(format!("* 언어/리소스 복사 오류: {}", e));
+                        return;
                     }
                 }
 

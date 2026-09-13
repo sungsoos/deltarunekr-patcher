@@ -18,15 +18,14 @@ case "${OS_NAME}" in
         echo "=== 바이너리 복사 중 ==="
         cp "${RELEASE_DIR}/deltarunekr_patcher" "${DIST_DIR}/Linux-Patcher-bin"
         chmod +x "${DIST_DIR}/Linux-Patcher-bin"
-        echo "[+] 리눅스 바이너리 복사됨: ${DIST_DIR}/Linux-Patcher-bin"
-
+        echo "[+] 리눅스 단일 바이너리 생성됨: ${DIST_DIR}/Linux-Patcher-bin"
         ;;
 
     Darwin*)
         echo "=== 바이너리 복사 중 ==="
         cp "${RELEASE_DIR}/deltarunekr_patcher" "${DIST_DIR}/MacOS-Patcher-bin"
         chmod +x "${DIST_DIR}/MacOS-Patcher-bin"
-        echo "[+] macOS 바이너리 복사됨: ${DIST_DIR}/MacOS-Patcher-bin"
+        echo "[+] macOS 단일 바이너리 생성됨: ${DIST_DIR}/MacOS-Patcher-bin"
 
         echo "=== .app 번들 생성 중 ==="
         APP_BUNDLE="${DIST_DIR}/MacOS-Patcher.app"
