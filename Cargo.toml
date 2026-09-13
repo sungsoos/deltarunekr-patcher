@@ -24,9 +24,6 @@ vcdiff-decoder = "1.0"
 [target.'cfg(windows)'.dependencies]
 winreg = "0.52"
 
-
-
-
-
-
-
+[profile.release]
+lto = "thin"
+strip = true
