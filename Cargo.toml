@@ -6,6 +6,7 @@ edition = "2021"
 [build-dependencies]
 slint-build = "1.8"
 fs_extra = "1.3"
+flate2 = "1.0"
 
 [dependencies]
 slint = "1.8"
@@ -20,6 +21,8 @@ whoami = "1.5"
 arboard = "3.4"
 which = "6.0"
 vcdiff-decoder = "1.0"
+flate2 = "1.0"
+ureq = { version = "2.10", features = ["tls"] }
 
 [target.'cfg(windows)'.dependencies]
 winreg = "0.52"

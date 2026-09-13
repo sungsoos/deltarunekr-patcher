@@ -1,7 +1,7 @@
 use std::borrow::Cow;
 use std::collections::HashMap;
 use std::fs::{self, File};
-use std::io::{BufRead, BufReader};
+use std::io::{BufRead, BufReader, Read};
 use std::path::{Path, PathBuf};
 use std::process::Command as StdCommand;
 use std::rc::Rc;
@@ -9,54 +9,53 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
 
+use flate2::read::GzDecoder;
 use ini::Ini;
 use serde_json::Value;
 use slint::{Color, Model, ModelRc, SharedString, VecModel};
 
 slint::include_modules!();
 
-// -- 내장 패치 데이터 (압축 해제 없이 메모리에서 직접 사용) --
+// -- 내장 패치 데이터 --
 
-#[cfg(target_os = "macos")]
-mod embedded_patch {
-    pub static DETERWILL: &str = include_str!("../patch/deterwill.json");
-
-    pub static LAUNCHER_XDELTA: &[u8] = include_bytes!("../patch/xdelta_mac/launcher.xdelta");
-    pub static CH1_XDELTA: &[u8] = include_bytes!("../patch/xdelta_mac/ch1.xdelta");
-    pub static CH2_XDELTA: &[u8] = include_bytes!("../patch/xdelta_mac/ch2.xdelta");
-    pub static CH3_XDELTA: &[u8] = include_bytes!("../patch/xdelta_mac/ch3.xdelta");
-    pub static CH4_XDELTA: &[u8] = include_bytes!("../patch/xdelta_mac/ch4.xdelta");
-    pub static CH5_XDELTA: &[u8] = include_bytes!("../patch/xdelta_mac/ch5.xdelta");
-
-    pub static CH1_LANG_JA: &str = include_str!("../patch/lang_mac/chapter1_mac/lang/lang_ja.json");
-    pub static CH2_LANG_JA: &str = include_str!("../patch/lang_mac/chapter2_mac/lang/lang_ja.json");
-    pub static CH3_LANG_JA: &str = include_str!("../patch/lang_mac/chapter3_mac/lang/lang_ja.json");
-    pub static CH3_VID_TENNA: &[u8] = include_bytes!("../patch/lang_mac/chapter3_mac/vid/tennaIntroF1_compressed_28.mp4");
-    pub static CH3_VID_TENNA_KR: &[u8] = include_bytes!("../patch/lang_mac/chapter3_mac/vid/tennaIntroKRf1_compressed_28.mp4");
-    pub static CH4_LANG_JA: &str = include_str!("../patch/lang_mac/chapter4_mac/lang/lang_ja.json");
-    pub static CH5_LANG_JA: &str = include_str!("../patch/lang_mac/chapter5_mac/lang/lang_ja.json");
-    pub static CH5_VID_INTRO: &[u8] = include_bytes!("../patch/lang_mac/chapter5_mac/vid/ch5_intro_jp.mp4");
+fn decompress_gz(bytes: &[u8]) -> Vec<u8> {
+    let mut decoder = GzDecoder::new(bytes);
+    let mut out = Vec::new();
+    let _ = decoder.read_to_end(&mut out);
+    out
 }
 
-#[cfg(not(target_os = "macos"))]
+fn decompress_gz_str(bytes: &[u8]) -> String {
+    let bytes = decompress_gz(bytes);
+    String::from_utf8(bytes).unwrap_or_default()
+}
+
+fn decompress_gz_to_file(bytes: &[u8], dst: &Path) -> Result<(), String> {
+    let mut decoder = GzDecoder::new(bytes);
+    let mut file = File::create(dst).map_err(|e| format!("파일 생성 실패 ({:?}): {}", dst, e))?;
+    std::io::copy(&mut decoder, &mut file).map_err(|e| format!("압축 해제 실패 ({:?}): {}", dst, e))?;
+    Ok(())
+}
+
 mod embedded_patch {
-    pub static DETERWILL: &str = include_str!("../patch/deterwill.json");
+    pub static DETERWILL: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/compressed_patch/deterwill.json.gz"));
 
-    pub static LAUNCHER_XDELTA: &[u8] = include_bytes!("../patch/xdelta/launcher.xdelta");
-    pub static CH1_XDELTA: &[u8] = include_bytes!("../patch/xdelta/ch1.xdelta");
-    pub static CH2_XDELTA: &[u8] = include_bytes!("../patch/xdelta/ch2.xdelta");
-    pub static CH3_XDELTA: &[u8] = include_bytes!("../patch/xdelta/ch3.xdelta");
-    pub static CH4_XDELTA: &[u8] = include_bytes!("../patch/xdelta/ch4.xdelta");
-    pub static CH5_XDELTA: &[u8] = include_bytes!("../patch/xdelta/ch5.xdelta");
+    pub static LAUNCHER_XDELTA: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/compressed_patch/launcher.xdelta.gz"));
+    pub static CH1_XDELTA: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/compressed_patch/ch1.xdelta.gz"));
+    pub static CH2_XDELTA: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/compressed_patch/ch2.xdelta.gz"));
+    pub static CH3_XDELTA: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/compressed_patch/ch3.xdelta.gz"));
+    pub static CH4_XDELTA: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/compressed_patch/ch4.xdelta.gz"));
+    pub static CH5_XDELTA: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/compressed_patch/ch5.xdelta.gz"));
 
-    pub static CH1_LANG_JA: &str = include_str!("../patch/lang/chapter1_windows/lang/lang_ja.json");
-    pub static CH2_LANG_JA: &str = include_str!("../patch/lang/chapter2_windows/lang/lang_ja.json");
-    pub static CH3_LANG_JA: &str = include_str!("../patch/lang/chapter3_windows/lang/lang_ja.json");
-    pub static CH3_VID_TENNA: &[u8] = include_bytes!("../patch/lang/chapter3_windows/vid/tennaIntroF1_compressed_28.mp4");
-    pub static CH3_VID_TENNA_KR: &[u8] = include_bytes!("../patch/lang/chapter3_windows/vid/tennaIntroKRf1_compressed_28.mp4");
-    pub static CH4_LANG_JA: &str = include_str!("../patch/lang/chapter4_windows/lang/lang_ja.json");
-    pub static CH5_LANG_JA: &str = include_str!("../patch/lang/chapter5_windows/lang/lang_ja.json");
-    pub static CH5_VID_INTRO: &[u8] = include_bytes!("../patch/lang/chapter5_windows/vid/ch5_intro_jp.mp4");
+    pub static CH1_LANG_JA: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/compressed_patch/ch1_lang_ja.json.gz"));
+    pub static CH2_LANG_JA: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/compressed_patch/ch2_lang_ja.json.gz"));
+    pub static CH3_LANG_JA: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/compressed_patch/ch3_lang_ja.json.gz"));
+    pub static CH4_LANG_JA: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/compressed_patch/ch4_lang_ja.json.gz"));
+    pub static CH5_LANG_JA: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/compressed_patch/ch5_lang_ja.json.gz"));
+
+    pub static CH3_VID_TENNA: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/compressed_patch/ch3_tenna.mp4.gz"));
+    pub static CH3_VID_TENNA_KR: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/compressed_patch/ch3_tenna_kr.mp4.gz"));
+    pub static CH5_VID_INTRO: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/compressed_patch/ch5_intro.mp4.gz"));
 }
 
 fn get_xdelta_data(ch: usize) -> Option<Cow<'static, [u8]>> {
@@ -74,15 +73,16 @@ fn get_xdelta_data(ch: usize) -> Option<Cow<'static, [u8]>> {
         }
     }
 
-    match ch {
-        0 => Some(Cow::Borrowed(embedded_patch::LAUNCHER_XDELTA)),
-        1 => Some(Cow::Borrowed(embedded_patch::CH1_XDELTA)),
-        2 => Some(Cow::Borrowed(embedded_patch::CH2_XDELTA)),
-        3 => Some(Cow::Borrowed(embedded_patch::CH3_XDELTA)),
-        4 => Some(Cow::Borrowed(embedded_patch::CH4_XDELTA)),
-        5 => Some(Cow::Borrowed(embedded_patch::CH5_XDELTA)),
-        _ => None,
-    }
+    let raw = match ch {
+        0 => embedded_patch::LAUNCHER_XDELTA,
+        1 => embedded_patch::CH1_XDELTA,
+        2 => embedded_patch::CH2_XDELTA,
+        3 => embedded_patch::CH3_XDELTA,
+        4 => embedded_patch::CH4_XDELTA,
+        5 => embedded_patch::CH5_XDELTA,
+        _ => return None,
+    };
+    Some(Cow::Owned(decompress_gz(raw)))
 }
 
 fn get_chapter_lang_ja(ch: usize) -> Option<Cow<'static, str>> {
@@ -100,14 +100,15 @@ fn get_chapter_lang_ja(ch: usize) -> Option<Cow<'static, str>> {
         }
     }
 
-    match ch {
-        1 => Some(Cow::Borrowed(embedded_patch::CH1_LANG_JA)),
-        2 => Some(Cow::Borrowed(embedded_patch::CH2_LANG_JA)),
-        3 => Some(Cow::Borrowed(embedded_patch::CH3_LANG_JA)),
-        4 => Some(Cow::Borrowed(embedded_patch::CH4_LANG_JA)),
-        5 => Some(Cow::Borrowed(embedded_patch::CH5_LANG_JA)),
-        _ => None,
-    }
+    let raw = match ch {
+        1 => embedded_patch::CH1_LANG_JA,
+        2 => embedded_patch::CH2_LANG_JA,
+        3 => embedded_patch::CH3_LANG_JA,
+        4 => embedded_patch::CH4_LANG_JA,
+        5 => embedded_patch::CH5_LANG_JA,
+        _ => return None,
+    };
+    Some(Cow::Owned(decompress_gz_str(raw)))
 }
 
 fn get_deterwill_content() -> Cow<'static, str> {
@@ -123,28 +124,55 @@ fn get_deterwill_content() -> Cow<'static, str> {
             return Cow::Owned(c);
         }
     }
-    Cow::Borrowed(embedded_patch::DETERWILL)
+    Cow::Owned(decompress_gz_str(embedded_patch::DETERWILL))
+}
+
+fn deploy_video_file<F>(url: &str, fallback_gz: &[u8], dst: &Path, log_cb: &F)
+where
+    F: Fn(String, &'static str),
+{
+    let file_name = dst.file_name().unwrap_or_default().to_string_lossy();
+    log_cb(format!("* 비디오 다운로드 시도 중: {}...", file_name), "#FFFF00");
+
+    let mut download_ok = false;
+    let agent = ureq::builder()
+        .timeout_connect(Duration::from_secs(5))
+        .timeout_read(Duration::from_secs(60))
+        .build();
+
+    let tmp_dst = dst.with_extension("download_tmp");
+    match agent.get(url).call() {
+        Ok(resp) if resp.status() == 200 => {
+            if let Ok(mut file) = File::create(&tmp_dst) {
+                let mut reader = resp.into_reader();
+                if std::io::copy(&mut reader, &mut file).is_ok() {
+                    let _ = fs::rename(&tmp_dst, dst);
+                    download_ok = true;
+                    log_cb(format!("  * 원본 비디오 다운로드 완료: {}", file_name), "#88FF88");
+                }
+            }
+        }
+        Ok(resp) => {
+            log_cb(format!("  * 다운로드 서버 응답 코드 ({}): {}", resp.status(), file_name), "#FFAA00");
+        }
+        Err(e) => {
+            log_cb(format!("  * 다운로드 연결 실패 ({}): {}", e, file_name), "#FFAA00");
+        }
+    }
+
+    let _ = fs::remove_file(&tmp_dst);
+
+    if !download_ok {
+        log_cb(format!("  * 내장 비디오로 대체 ({})", file_name), "#FFAA00");
+        let _ = decompress_gz_to_file(fallback_gz, dst);
+    }
 }
 
 fn deploy_chapter_assets<F>(ch_num: usize, dst_chapter_dir: &Path, log_cb: &F) -> Result<(), String>
 where
     F: Fn(String, &'static str),
 {
-    let is_mac = cfg!(target_os = "macos");
-    let lang_folder = if is_mac { "lang_mac" } else { "lang" };
-    let ch_sub = if is_mac {
-        format!("chapter{}_mac", ch_num)
-    } else {
-        format!("chapter{}_windows", ch_num)
-    };
-    let disk_src = resource_path(format!("patch/{}/{}", lang_folder, ch_sub));
-
-    if disk_src.exists() {
-        copy_folder(&disk_src, dst_chapter_dir, log_cb)?;
-        return Ok(());
-    }
-
-    // 디스크에 별도 폴더가 없는 경우 내장 리소스를 게임 디렉터리에 직접 복사
+    // 언어 파일 복사
     let lang_dir = dst_chapter_dir.join("lang");
     fs::create_dir_all(&lang_dir).map_err(|e| format!("폴더 생성 실패 ({:?}): {}", lang_dir, e))?;
 
@@ -154,27 +182,32 @@ where
             .map_err(|e| format!("언어 파일 작성 실패 ({:?}): {}", lang_file, e))?;
     }
 
+    // 서버에서 비디오 파일 다운로드 및 복사
+    // 하드코딩 조아
     if ch_num == 3 {
         let vid_dir = dst_chapter_dir.join("vid");
         fs::create_dir_all(&vid_dir).map_err(|e| format!("폴더 생성 실패 ({:?}): {}", vid_dir, e))?;
-        fs::write(
-            vid_dir.join("tennaIntroF1_compressed_28.mp4"),
+        deploy_video_file(
+            "https://dtkr.sungsoos.kr/patch/lang/chapter3_windows/vid/tennaIntroF1_compressed_28.mp4",
             embedded_patch::CH3_VID_TENNA,
-        )
-        .map_err(|e| format!("비디오 복사 실패: {}", e))?;
-        fs::write(
-            vid_dir.join("tennaIntroKRf1_compressed_28.mp4"),
+            &vid_dir.join("tennaIntroF1_compressed_28.mp4"),
+            log_cb,
+        );
+        deploy_video_file(
+            "https://dtkr.sungsoos.kr/patch/lang/chapter3_windows/vid/tennaIntroKRf1_compressed_28.mp4",
             embedded_patch::CH3_VID_TENNA_KR,
-        )
-        .map_err(|e| format!("비디오 복사 실패: {}", e))?;
+            &vid_dir.join("tennaIntroKRf1_compressed_28.mp4"),
+            log_cb,
+        );
     } else if ch_num == 5 {
         let vid_dir = dst_chapter_dir.join("vid");
         fs::create_dir_all(&vid_dir).map_err(|e| format!("폴더 생성 실패 ({:?}): {}", vid_dir, e))?;
-        fs::write(
-            vid_dir.join("ch5_intro_jp.mp4"),
+        deploy_video_file(
+            "https://dtkr.sungsoos.kr/patch/lang/chapter5_windows/vid/ch5_intro_jp.mp4",
             embedded_patch::CH5_VID_INTRO,
-        )
-        .map_err(|e| format!("비디오 복사 실패: {}", e))?;
+            &vid_dir.join("ch5_intro_jp.mp4"),
+            log_cb,
+        );
     }
 
     Ok(())
@@ -614,31 +647,6 @@ fn patchit(target_file: &Path, delta_bytes: &[u8], delta_name: &str) -> Result<(
     Ok(())
 }
 
-fn copy_folder<F>(src_dir: &Path, dst_dir: &Path, log_cb: &F) -> Result<(), String>
-where
-    F: Fn(String, &'static str),
-{
-    if !dst_dir.exists() {
-        fs::create_dir_all(dst_dir).map_err(|e| e.to_string())?;
-    }
-    if let Ok(entries) = fs::read_dir(src_dir) {
-        for entry in entries.flatten() {
-            let src_path = entry.path();
-            let file_name = entry.file_name();
-            let dst_path = dst_dir.join(&file_name);
-            if src_path.is_dir() {
-                copy_folder(&src_path, &dst_path, log_cb)?;
-            } else {
-                fs::copy(&src_path, &dst_path).map_err(|e| e.to_string())?;
-                log_cb(
-                    format!("  * 복사 완료: {}", file_name.to_string_lossy()),
-                    "#88FF88",
-                );
-            }
-        }
-    }
-    Ok(())
-}
 
 fn adjust_josa(word: &str, josa: &str) -> String {
     if word.is_empty() {
@@ -1391,3 +1399,4 @@ fn main() -> Result<(), slint::PlatformError> {
 
     main_window.run()
 }
+

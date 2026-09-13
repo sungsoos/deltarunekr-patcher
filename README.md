@@ -1,5 +1,6 @@
 # 델타룬 한글 패처
 최적화된 델타룬 한글 패처
+> ⚠️ 영상 파일들이 용량을 많이 차지해, [dtkr.sungsoos.kr](https://dtkr.sungsoos.kr)에서 다운로드됩니다!
 > 웹 버전 패처: [https://dtkr.sungsoos.kr](https://dtkr.sungsoos.kr/)
 
 ## 실행 및 사용 방법
