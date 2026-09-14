@@ -116,6 +116,7 @@ deltarunekr_patcher/
 
 ## 스크린샷
 ![EndeavourOS](/images/linux.png)
+![Windows 11](/images/windows11.png)
 
 ## 📜 라이선스 및 참고 사항 (Notice)
 - 델타돋움체: qhtjr1116 제작, 링크: [https://eocnd1116.github.io/qhtjrFont/index.html?type=1&n=0](https://eocnd1116.github.io/qhtjrFont/index.html?type=1&n=0)
