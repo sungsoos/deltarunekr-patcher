@@ -115,8 +115,14 @@ deltarunekr_patcher/
 ```
 
 ## 스크린샷
+### Linux (EndeavourOS)
 ![EndeavourOS](/images/linux.png)
+### Windows 11
 ![Windows 11](/images/windows11.png)
+### MacOS 15 x64 (VM)
+![MacOS 15 x64](/images/macos15_64.png)
+### MacOS 26 Apple Silicon
+![누군가 해주세요...](/images/macos26_as.png)
 
 ## 📜 라이선스 및 참고 사항 (Notice)
 - 델타돋움체: qhtjr1116 제작, 링크: [https://eocnd1116.github.io/qhtjrFont/index.html?type=1&n=0](https://eocnd1116.github.io/qhtjrFont/index.html?type=1&n=0)
