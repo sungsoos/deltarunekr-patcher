@@ -311,16 +311,109 @@ fn canonicalize_clean(path: &Path) -> std::io::Result<PathBuf> {
     Ok(clean_path(&p))
 }
 
+// DELTARUNE.app 및 하위 경로 탐색
+fn find_child_dir_case_insensitive(parent: &Path, name: &str) -> Option<PathBuf> {
+    let direct = parent.join(name);
+    if direct.is_dir() {
+        return Some(direct);
+    }
+    if let Ok(entries) = fs::read_dir(parent) {
+        for entry in entries.flatten() {
+            if entry.file_name().to_string_lossy().eq_ignore_ascii_case(name) {
+                let p = entry.path();
+                if p.is_dir() {
+                    return Some(p);
+                }
+            }
+        }
+    }
+    None
+}
+
+fn find_app_bundle(dir: &Path) -> Option<PathBuf> {
+    if !dir.exists() {
+        return None;
+    }
+
+    // .app 번들인 경우
+    if let Some(name) = dir.file_name() {
+        if name.to_string_lossy().eq_ignore_ascii_case("deltarune.app") {
+            return Some(dir.to_path_buf());
+        }
+    }
+
+    // .app 번들 내부 경로인 경우 (Contents/Resources 등)
+    let mut curr = dir.to_path_buf();
+    while let Some(parent) = curr.parent() {
+        if let Some(name) = curr.file_name() {
+            if name.to_string_lossy().eq_ignore_ascii_case("deltarune.app") {
+                return Some(curr);
+            }
+        }
+        curr = parent.to_path_buf();
+    }
+
+    // DELTARUNE.app을 포함하는 상위 폴더인 경우
+    if let Ok(entries) = fs::read_dir(dir) {
+        for entry in entries.flatten() {
+            let name = entry.file_name();
+            if name.to_string_lossy().eq_ignore_ascii_case("deltarune.app") {
+                let p = entry.path();
+                if p.is_dir() {
+                    return Some(p);
+                }
+            }
+        }
+    }
+
+    None
+}
+
+fn find_app_resources(app_bundle: &Path) -> Option<PathBuf> {
+    let standard = app_bundle.join("Contents").join("Resources");
+    if standard.is_dir() {
+        return Some(standard);
+    }
+
+    let contents_dir = find_child_dir_case_insensitive(app_bundle, "Contents")?;
+    find_child_dir_case_insensitive(&contents_dir, "Resources")
+}
+
 fn resolve_game_folder(dir: &Path) -> PathBuf {
+    resolve_game_folder_with_os(dir, cfg!(target_os = "macos"))
+}
+
+fn resolve_game_folder_with_os(dir: &Path, is_mac: bool) -> PathBuf {
     let cleaned = clean_path(dir);
-    if cfg!(target_os = "macos") {
-        let cand_app_resources = cleaned.join("DELTARUNE.app").join("Contents").join("Resources");
-        if cand_app_resources.exists() {
-            return cand_app_resources;
+    if is_mac {
+        if let Some(app_bundle) = find_app_bundle(&cleaned) {
+            if let Some(resources) = find_app_resources(&app_bundle) {
+                return resources;
+            }
         }
         let cand_resources = cleaned.join("Contents").join("Resources");
         if cand_resources.exists() {
             return cand_resources;
+        }
+    }
+    cleaned
+}
+
+fn resolve_containing_folder(dir: &Path) -> PathBuf {
+    resolve_containing_folder_with_os(dir, cfg!(target_os = "macos"))
+}
+
+fn resolve_containing_folder_with_os(dir: &Path, is_mac: bool) -> PathBuf {
+    let cleaned = clean_path(dir);
+    if is_mac {
+        if let Some(app_bundle) = find_app_bundle(&cleaned) {
+            if cleaned == app_bundle || cleaned.starts_with(&app_bundle) {
+                if let Some(parent) = app_bundle.parent() {
+                    return parent.to_path_buf();
+                }
+            } else {
+                return cleaned;
+            }
         }
     }
     cleaned
@@ -339,12 +432,38 @@ fn find_launcher_data_file(target_dir: &Path, is_mac: bool) -> Option<PathBuf> {
             }
         }
 
-        let cand_app = target_dir.join("DELTARUNE.app").join("Contents").join("Resources");
-        if cand_app.exists() {
-            for name in ["game.ios", "data.ios", "data.win"] {
-                let p = cand_app.join(name);
-                if p.exists() {
-                    return Some(p);
+        if let Ok(entries) = fs::read_dir(target_dir) {
+            for entry in entries.flatten() {
+                let fname = entry.file_name();
+                let fname_str = fname.to_string_lossy();
+                for target_name in ["game.ios", "data.ios", "data.win"] {
+                    if fname_str.eq_ignore_ascii_case(target_name) {
+                        return Some(entry.path());
+                    }
+                }
+            }
+        }
+
+        if let Some(app_bundle) = find_app_bundle(target_dir) {
+            if let Some(resources) = find_app_resources(&app_bundle) {
+                if resources != target_dir {
+                    for name in ["game.ios", "data.ios", "data.win"] {
+                        let p = resources.join(name);
+                        if p.exists() {
+                            return Some(p);
+                        }
+                    }
+                    if let Ok(entries) = fs::read_dir(&resources) {
+                        for entry in entries.flatten() {
+                            let fname = entry.file_name();
+                            let fname_str = fname.to_string_lossy();
+                            for target_name in ["game.ios", "data.ios", "data.win"] {
+                                if fname_str.eq_ignore_ascii_case(target_name) {
+                                    return Some(entry.path());
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -370,6 +489,17 @@ fn find_chapter_data_file(chapter_dir: &Path, is_mac: bool) -> Option<PathBuf> {
                 return Some(p);
             }
         }
+        if let Ok(entries) = fs::read_dir(chapter_dir) {
+            for entry in entries.flatten() {
+                let fname = entry.file_name();
+                let fname_str = fname.to_string_lossy();
+                for target_name in ["game.ios", "data.ios", "data.win"] {
+                    if fname_str.eq_ignore_ascii_case(target_name) {
+                        return Some(entry.path());
+                    }
+                }
+            }
+        }
     } else {
         let p = chapter_dir.join("data.win");
         if p.exists() {
@@ -381,12 +511,19 @@ fn find_chapter_data_file(chapter_dir: &Path, is_mac: bool) -> Option<PathBuf> {
 }
 
 fn validate_deltarune_folder(raw_dir: &Path) -> (bool, Option<String>) {
+    validate_deltarune_folder_with_os(raw_dir, cfg!(target_os = "macos"))
+}
+
+fn validate_deltarune_folder_with_os(raw_dir: &Path, is_mac: bool) -> (bool, Option<String>) {
     if !raw_dir.exists() {
         return (false, Some("폴더가 존재하지 않습니다.".to_string()));
     }
 
-    let is_mac = cfg!(target_os = "macos");
-    let resolved = resolve_game_folder(raw_dir);
+    if is_mac && find_app_bundle(raw_dir).is_none() {
+        return (false, Some("DELTARUNE.app을 찾을 수 없습니다.".to_string()));
+    }
+
+    let resolved = resolve_game_folder_with_os(raw_dir, is_mac);
     let target_dir = resolved.as_path();
 
     if find_launcher_data_file(target_dir, is_mac).is_none() {
@@ -412,10 +549,11 @@ fn validate_deltarune_folder(raw_dir: &Path) -> (bool, Option<String>) {
 
         let mut found = false;
         for fn_name in &folder_candidates {
-            let cbase = target_dir.join(fn_name);
-            if find_chapter_data_file(&cbase, is_mac).is_some() {
-                found = true;
-                break;
+            if let Some(cbase) = find_child_dir_case_insensitive(target_dir, fn_name) {
+                if find_chapter_data_file(&cbase, is_mac).is_some() {
+                    found = true;
+                    break;
+                }
             }
         }
 
@@ -514,13 +652,32 @@ fn detect_deltarune() -> Option<PathBuf> {
     }
 
     for lib in steam_libraries {
+        let common_dir = lib.join("steamapps").join("common");
+        if !common_dir.exists() {
+            continue;
+        }
+
         for folder_name in ["DELTARUNE", "Deltarune", "deltarune"] {
-            let common_path = lib.join("steamapps").join("common").join(folder_name);
+            let common_path = common_dir.join(folder_name);
             if let Ok(real_path) = canonicalize_clean(&common_path) {
-                let resolved = resolve_game_folder(&real_path);
-                let (valid, _) = validate_deltarune_folder(&resolved);
+                let containing = resolve_containing_folder(&real_path);
+                let (valid, _) = validate_deltarune_folder(&containing);
                 if valid {
-                    return Some(clean_path(&resolved));
+                    return Some(clean_path(&containing));
+                }
+            }
+        }
+
+        // 대소문자가 다른 경우를 대비한 common 폴더 검색
+        if let Ok(entries) = fs::read_dir(&common_dir) {
+            for entry in entries.flatten() {
+                if entry.file_name().to_string_lossy().eq_ignore_ascii_case("deltarune") {
+                    let real_path = clean_path(&entry.path());
+                    let containing = resolve_containing_folder(&real_path);
+                    let (valid, _) = validate_deltarune_folder(&containing);
+                    if valid {
+                        return Some(clean_path(&containing));
+                    }
                 }
             }
         }
@@ -1002,21 +1159,28 @@ fn clean_tmp_files(target_dir: &Path) {
         target_dir.join("data.win.tmp"),
         target_dir.join("data.ios.tmp"),
         target_dir.join("game.ios.tmp"),
-        target_dir.join("DELTARUNE.app").join("Contents").join("Resources").join("data.ios.tmp"),
-        target_dir.join("DELTARUNE.app").join("Contents").join("Resources").join("data.win.tmp"),
-        target_dir.join("DELTARUNE.app").join("Contents").join("Resources").join("game.ios.tmp"),
     ];
+
+    if let Some(app_bundle) = find_app_bundle(target_dir) {
+        if let Some(resources) = find_app_resources(&app_bundle) {
+            tmp_candidates.push(resources.join("data.ios.tmp"));
+            tmp_candidates.push(resources.join("data.win.tmp"));
+            tmp_candidates.push(resources.join("game.ios.tmp"));
+        }
+    }
+
     for i in 1..=5 {
         for fn_name in [
             format!("chapter{}_windows", i),
             format!("chapter{}_mac", i),
             format!("chapter{}", i),
         ] {
-            let cbase = target_dir.join(&fn_name);
-            tmp_candidates.push(cbase.join("data.win.tmp"));
-            tmp_candidates.push(cbase.join("data.ios.tmp"));
-            tmp_candidates.push(cbase.join("game.ios.tmp"));
-            tmp_candidates.push(cbase.join("lang").join("lang_ja.json.tmp"));
+            if let Some(cbase) = find_child_dir_case_insensitive(target_dir, &fn_name) {
+                tmp_candidates.push(cbase.join("data.win.tmp"));
+                tmp_candidates.push(cbase.join("data.ios.tmp"));
+                tmp_candidates.push(cbase.join("game.ios.tmp"));
+                tmp_candidates.push(cbase.join("lang").join("lang_ja.json.tmp"));
+            }
         }
     }
 
@@ -1137,11 +1301,12 @@ fn main() -> Result<(), slint::PlatformError> {
                         .expect("VecModel");
 
                     if let Some(chosen_dir) = chosen {
-                        let p = resolve_game_folder(&chosen_dir);
-                        let (valid, err_msg) = validate_deltarune_folder(&p);
+                        let chosen_clean = clean_path(&chosen_dir);
+                        let containing = resolve_containing_folder(&chosen_clean);
+                        let (valid, err_msg) = validate_deltarune_folder(&containing);
                         if valid {
-                            *folder_ref.lock().unwrap() = Some(p.clone());
-                            let path_msg = format!("* 선택된 폴더: {}", redact_user_path(&p.to_string_lossy()));
+                            *folder_ref.lock().unwrap() = Some(containing.clone());
+                            let path_msg = format!("* 선택된 폴더: {}", redact_user_path(&containing.to_string_lossy()));
                             window.set_folder_path(SharedString::from(&path_msg));
                             window.set_patch_enabled(true);
                             vec_model.push(LogItem {
@@ -1157,7 +1322,7 @@ fn main() -> Result<(), slint::PlatformError> {
                             window.set_patch_enabled(false);
                             let err_line = format!(
                                 "* 검증 실패: {} - {}",
-                                redact_user_path(&p.to_string_lossy()),
+                                redact_user_path(&chosen_clean.to_string_lossy()),
                                 err_msg.unwrap_or_default()
                             );
                             vec_model.push(LogItem {
@@ -1318,14 +1483,15 @@ fn main() -> Result<(), slint::PlatformError> {
                     return;
                 }
 
-                clean_tmp_files(&folder);
+                let job_dir = resolve_game_folder(&folder);
+                clean_tmp_files(&job_dir);
 
                 let is_mac = cfg!(target_os = "macos");
 
                 // 런처 패치 확인 (메모리 내장 데이터 또는 로컬 파일)
                 let launcher_delta = get_xdelta_data(0);
                 let valid_launcher_target = if launcher_delta.is_some() {
-                    let target = find_launcher_data_file(&folder, is_mac);
+                    let target = find_launcher_data_file(&job_dir, is_mac);
                     if target.is_none() {
                         let expected = if is_mac { "game.ios" } else { "data.win" };
                         on_error(format!("* 검증 실패: 런처 데이터({})를 찾을 수 없습니다.", expected));
@@ -1360,10 +1526,11 @@ fn main() -> Result<(), slint::PlatformError> {
 
                     let mut found_target = None;
                     for fn_name in &folder_candidates {
-                        let cbase = folder.join(fn_name);
-                        if let Some(target) = find_chapter_data_file(&cbase, is_mac) {
-                            found_target = Some(target);
-                            break;
+                        if let Some(cbase) = find_child_dir_case_insensitive(&job_dir, fn_name) {
+                            if let Some(target) = find_chapter_data_file(&cbase, is_mac) {
+                                found_target = Some(target);
+                                break;
+                            }
                         }
                     }
 
@@ -1411,11 +1578,13 @@ fn main() -> Result<(), slint::PlatformError> {
 
                 log_cb("--- 언어 파일 및 리소스 복사 중 ---".to_string(), "#FFFF00");
                 for (ch_num, _, _) in &valid_chapter_targets {
-                    let dst_chapter_dir = if is_mac {
-                        folder.join(format!("chapter{}_mac", ch_num))
+                    let folder_name = if is_mac {
+                        format!("chapter{}_mac", ch_num)
                     } else {
-                        folder.join(format!("chapter{}_windows", ch_num))
+                        format!("chapter{}_windows", ch_num)
                     };
+                    let dst_chapter_dir = find_child_dir_case_insensitive(&job_dir, &folder_name)
+                        .unwrap_or_else(|| job_dir.join(&folder_name));
 
                     if let Err(e) = deploy_chapter_assets(*ch_num, &dst_chapter_dir, &log_cb) {
                         on_error(format!("* 언어/리소스 복사 오류: {}", e));
@@ -1432,7 +1601,7 @@ fn main() -> Result<(), slint::PlatformError> {
                         "--- 고급 설정 (사용자 정의 명칭 치환) 적용 중 ---".to_string(),
                         "#FFFF00",
                     );
-                    apply_custom_words(&folder, &custom_words, &log_cb);
+                    apply_custom_words(&job_dir, &custom_words, &log_cb);
                 }
 
                 log_cb(
@@ -1478,11 +1647,8 @@ fn main() -> Result<(), slint::PlatformError> {
                                             let _ = StdCommand::new(exe).current_dir(folder).spawn();
                                         }
                                     } else if cfg!(target_os = "macos") {
-                                        let app = folder.join("DELTARUNE.app");
-                                        if app.exists() {
+                                        if let Some(app) = find_app_bundle(folder) {
                                             let _ = StdCommand::new("open").arg(app).spawn();
-                                        } else if folder.extension().map_or(false, |e| e == "app") {
-                                            let _ = StdCommand::new("open").arg(folder).spawn();
                                         }
                                     } else {
                                         let exe = folder.join("DELTARUNE");
@@ -1521,3 +1687,90 @@ fn main() -> Result<(), slint::PlatformError> {
     main_window.run()
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+
+    struct TempDir {
+        path: PathBuf,
+    }
+
+    impl TempDir {
+        fn new(name: &str) -> Self {
+            let path = std::env::temp_dir().join(format!("dtkr_test_{}_{}", name, std::process::id()));
+            let _ = fs::remove_dir_all(&path);
+            fs::create_dir_all(&path).unwrap();
+            Self { path }
+        }
+    }
+
+    impl Drop for TempDir {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.path);
+        }
+    }
+
+    #[test]
+    fn test_macos_case_insensitive_app_detection() {
+        for app_name in ["DELTARUNE.app", "deltarune.app", "DeltaRune.app"] {
+            let temp = TempDir::new(app_name);
+            let app_dir = temp.path.join(app_name);
+            let res_dir = app_dir.join("Contents").join("Resources");
+            fs::create_dir_all(&res_dir).unwrap();
+
+            // DELTARUNE.app을 포함하는 상위 폴더 선택
+            let containing = resolve_containing_folder_with_os(&temp.path, true);
+            assert_eq!(containing, temp.path);
+
+            // 작업 폴더는 DELTARUNE.app/Contents/Resources
+            let job_dir = resolve_game_folder_with_os(&temp.path, true);
+            assert_eq!(job_dir, res_dir);
+
+            // .app 직접 선택 시에도 상위 폴더 및 작업 폴더가 올바르게 반환되는지
+            let containing_from_app = resolve_containing_folder_with_os(&app_dir, true);
+            assert_eq!(containing_from_app, temp.path);
+            let job_from_app = resolve_game_folder_with_os(&app_dir, true);
+            assert_eq!(job_from_app, res_dir);
+
+            // Contents/Resources 선택 시에도 올바르게 반환되는지
+            let containing_from_res = resolve_containing_folder_with_os(&res_dir, true);
+            assert_eq!(containing_from_res, temp.path);
+            let job_from_res = resolve_game_folder_with_os(&res_dir, true);
+            assert_eq!(job_from_res, res_dir);
+        }
+    }
+
+    #[test]
+    fn test_macos_validation() {
+        let temp = TempDir::new("validation");
+        let app_dir = temp.path.join("deltarune.app");
+        let res_dir = app_dir.join("Contents").join("Resources");
+        fs::create_dir_all(&res_dir).unwrap();
+
+        // 런처 파일 및 챕터 파일 없을 때 검증 실패
+        let (valid, err) = validate_deltarune_folder_with_os(&temp.path, true);
+        assert!(!valid);
+        assert!(err.unwrap().contains("런처 파일"));
+
+        // 런처 파일 생성
+        fs::write(res_dir.join("game.ios"), b"launcher").unwrap();
+
+        // 챕터 파일 생성
+        for i in 1..=5 {
+            let ch_dir = res_dir.join(format!("chapter{}_mac", i));
+            fs::create_dir_all(&ch_dir).unwrap();
+            fs::write(ch_dir.join("game.ios"), b"chapter").unwrap();
+        }
+
+        // 검증 성공 확인
+        let (valid, err) = validate_deltarune_folder_with_os(&temp.path, true);
+        assert!(valid, "오류 발생: {:?}", err);
+
+        // DELTARUNE.app이 없는 폴더 선택 시 검증 실패 확인
+        let empty_temp = TempDir::new("empty");
+        let (valid, err) = validate_deltarune_folder_with_os(&empty_temp.path, true);
+        assert!(!valid);
+        assert_eq!(err, Some("DELTARUNE.app을 찾을 수 없습니다.".to_string()));
+    }
+}
