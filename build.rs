@@ -20,6 +20,14 @@ fn main() {
     let target_os = env::var("CARGO_CFG_TARGET_OS").unwrap_or_default();
     let is_mac = target_os == "macos";
 
+    // Windows 실행 파일 아이콘 설정
+    if target_os == "windows" {
+        let mut res = winres::WindowsResource::new();
+        let ico_path = manifest_dir.join("assets").join("icon.ico");
+        res.set_icon(ico_path.to_str().unwrap());
+        let _ = res.compile();
+    }
+
     // 패치 파일 압축하여 임베딩용 디렉터리에 저장
     let comp_dir = out_dir.join("compressed_patch");
     let _ = std::fs::create_dir_all(&comp_dir);

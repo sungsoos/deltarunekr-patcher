@@ -3,7 +3,7 @@
 use std::borrow::Cow;
 use std::collections::HashMap;
 use std::fs::{self, File};
-use std::io::{BufRead, BufReader, Read};
+use std::io::{BufRead, BufReader, Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::Command as StdCommand;
 use std::rc::Rc;
@@ -590,6 +590,29 @@ struct PatchError {
     summary: String,
 }
 
+fn decode_with_oxidelta(
+    source: &[u8],
+    delta_bytes: &[u8],
+    tmp_path: &Path,
+    verify_checksum: bool,
+) -> Result<(), String> {
+    let mut decoder = oxidelta::compress::decoder::DeltaDecoder::with_checksum(
+        std::io::Cursor::new(delta_bytes),
+        verify_checksum,
+    );
+    let out_file = fs::File::create(tmp_path)
+        .map_err(|e| format!("임시 출력 파일 생성 실패: {}", e))?;
+    let mut writer = std::io::BufWriter::new(out_file);
+    let mut src: &[u8] = source;
+    decoder
+        .decode_to(&mut src, &mut writer)
+        .map_err(|e| format!("디코딩 오류: {}", e))?;
+    writer
+        .flush()
+        .map_err(|e| format!("임시 파일 플러시 실패: {}", e))?;
+    Ok(())
+}
+
 fn patchit(target_file: &Path, delta_bytes: &[u8], delta_name: &str) -> Result<(), PatchError> {
     let target_file = clean_path(target_file);
     let clean_target = redact_user_path(&target_file.to_string_lossy());
@@ -627,86 +650,76 @@ fn patchit(target_file: &Path, delta_bytes: &[u8], delta_name: &str) -> Result<(
     let mut patched_ok = false;
     let mut detail_logs: Vec<String> = Vec::new();
 
-    // 1. xdelta3 CLI 시도
-    let xdelta3_bin = get_xdelta3_binary();
-    if let Some(ref bin) = xdelta3_bin {
-        let delta_tmp = clean_path(&std::env::temp_dir().join(format!(
-            "xdelta_tmp_{}_{}",
-            delta_name,
-            std::process::id()
-        )));
-        match fs::write(&delta_tmp, delta_bytes) {
-            Ok(_) => {
-                let cmd_result = StdCommand::new(bin)
-                    .args([
-                        "-d",
-                        "-f",
-                        "-s",
-                        target_file.to_str().unwrap_or_default(),
-                        delta_tmp.to_str().unwrap_or_default(),
-                        tmp_file.to_str().unwrap_or_default(),
-                    ])
-                    .output();
-                let _ = fs::remove_file(&delta_tmp);
+    match fs::read(&target_file) {
+        Ok(source) => {
+            // 체크섬 검증
+            match decode_with_oxidelta(&source, delta_bytes, &tmp_file, true) {
+                Ok(_) if tmp_file.exists() && fs::metadata(&tmp_file).map(|m| m.len()).unwrap_or(0) > 0 => {
+                    patched_ok = true;
+                }
+                Err(e) => {
+                    detail_logs.push(format!("oxidelta 1차 디코딩 실패: {}", e));
+                    let _ = fs::remove_file(&tmp_file);
 
-                match cmd_result {
-                    Ok(out) => {
-                        let stdout = String::from_utf8_lossy(&out.stdout).trim().to_string();
-                        let stderr = String::from_utf8_lossy(&out.stderr).trim().to_string();
-                        if out.status.success()
-                            && tmp_file.exists()
-                            && fs::metadata(&tmp_file).map(|m| m.len()).unwrap_or(0) > 0
-                        {
+                    // 체크섬 무시
+                    match decode_with_oxidelta(&source, delta_bytes, &tmp_file, false) {
+                        Ok(_) if tmp_file.exists() && fs::metadata(&tmp_file).map(|m| m.len()).unwrap_or(0) > 0 => {
                             patched_ok = true;
-                        } else {
-                            let mut xdelta_err = format!("xdelta3 실행 종료 코드: {:?}", out.status.code());
-                            if !stderr.is_empty() {
-                                xdelta_err.push_str(&format!("\nxdelta3 stderr: {}", stderr));
-                            }
-                            if !stdout.is_empty() {
-                                xdelta_err.push_str(&format!("\nxdelta3 stdout: {}", stdout));
-                            }
-                            detail_logs.push(xdelta_err);
                         }
-                    }
-                    Err(e) => {
-                        detail_logs.push(format!("xdelta3 프로세스 실행 실패: {}", e));
+                        Err(e2) => {
+                            detail_logs.push(format!("oxidelta 체크섬 무시 디코딩 실패: {}", e2));
+                            let _ = fs::remove_file(&tmp_file);
+                        }
+                        _ => {}
                     }
                 }
-            }
-            Err(e) => {
-                detail_logs.push(format!("임시 패치 파일 쓰기 실패: {}", e));
+                _ => {}
             }
         }
-    } else {
-        detail_logs.push("xdelta3 실행 바이너리를 찾을 수 없어 내장 디코더로 진행합니다.".to_string());
+        Err(e) => {
+            detail_logs.push(format!("원본 파일 읽기 실패 ({}): {}", clean_target, e));
+        }
     }
 
-    // 2. 내장 vcdiff-decoder 사용 (메모리에서 바로 디코딩)
+    // xdelta3 CLI를 시도
     if !patched_ok {
-        match fs::read(&target_file) {
-            Ok(target_bytes) => {
-                let mut delta_cursor = std::io::Cursor::new(delta_bytes);
-                let mut patch_cursor = std::io::Cursor::new(target_bytes.as_slice());
-                let mut out_buf = Vec::new();
+        if let Some(ref bin) = get_xdelta3_binary() {
+            let delta_tmp = clean_path(&std::env::temp_dir().join(format!(
+                "xdelta_tmp_{}_{}",
+                delta_name,
+                std::process::id()
+            )));
+            if let Ok(_) = fs::write(&delta_tmp, delta_bytes) {
+                let mut cmd = StdCommand::new(bin);
+                cmd.args([
+                    "-d",
+                    "-f",
+                    "-s",
+                    target_file.to_str().unwrap_or_default(),
+                    delta_tmp.to_str().unwrap_or_default(),
+                    tmp_file.to_str().unwrap_or_default(),
+                ])
+                .stdin(std::process::Stdio::null());
 
-                match vcdiff_decoder::apply_patch(&mut delta_cursor, Some(&mut patch_cursor), &mut out_buf) {
-                    Ok(_) => {
-                        if let Err(e) = fs::write(&tmp_file, &out_buf) {
-                            detail_logs.push(format!("내장 디코더 출력 파일 쓰기 실패: {}", e));
-                        } else if tmp_file.exists() && fs::metadata(&tmp_file).map(|m| m.len()).unwrap_or(0) > 0 {
-                            patched_ok = true;
-                        } else {
-                            detail_logs.push("내장 디코더 출력 파일이 비어 있습니다.".to_string());
-                        }
-                    }
-                    Err(e) => {
-                        detail_logs.push(format!("내장 vcdiff 디코더 오류: {:?}", e));
+                #[cfg(windows)]
+                {
+                    use std::os::windows::process::CommandExt;
+                    cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
+                }
+
+                if let Ok(out) = cmd.output() {
+                    let stdout = String::from_utf8_lossy(&out.stdout).trim().to_string();
+                    let stderr = String::from_utf8_lossy(&out.stderr).trim().to_string();
+                    if out.status.success()
+                        && tmp_file.exists()
+                        && fs::metadata(&tmp_file).map(|m| m.len()).unwrap_or(0) > 0
+                    {
+                        patched_ok = true;
+                    } else {
+                        detail_logs.push(format!("xdelta3 CLI 실패 (코드 {:?}): {} {}", out.status.code(), stderr, stdout));
                     }
                 }
-            }
-            Err(e) => {
-                detail_logs.push(format!("원본 파일 읽기 실패 ({:?}): {}", target_file, e));
+                let _ = fs::remove_file(&delta_tmp);
             }
         }
     }
