@@ -35,8 +35,15 @@ jobs:
           path: dist/Linux-Patcher-bin
 
   build-macos:
-    name: macOS
+    name: macOS (${{ matrix.arch }})
     runs-on: macos-latest
+    strategy:
+      matrix:
+        include:
+          - arch: arm64
+            target: aarch64-apple-darwin
+          - arch: x86_64
+            target: x86_64-apple-darwin
 
     steps:
       - name: 리포지토리 체크아웃
@@ -44,22 +51,24 @@ jobs:
 
       - name: 러스트 툴체인 설치
         uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
 
       - name: 러스트 캐시 설치
         uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.target }}
 
       - name: 빌드
         run: |
           chmod +x build.sh
-          ./build.sh
+          ./build.sh ${{ matrix.target }}
 
       - name: 업로드
         uses: actions/upload-artifact@v4
         with:
-          name: MacOS-Package
-          path: |
-            dist/MacOS-Patcher-bin
-            dist/MacOS-Patcher.app
+          name: MacOS-${{ matrix.arch }}-Package
+          path: dist/MacOS-Patcher-${{ matrix.arch }}
 
   build-windows:
     name: Windows

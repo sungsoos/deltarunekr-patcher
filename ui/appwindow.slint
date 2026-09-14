@@ -66,7 +66,12 @@ export component MainWindow inherits Window {
             alignment: space-between;
 
             TouchArea {
-                width: 80%;
+                horizontal-stretch: 1;
+                pointer-event(event) => {
+                    if (event.button == PointerEventButton.left && event.kind == PointerEventKind.down) {
+                        root.drag-window();
+                    }
+                }
                 moved => { root.drag-window(); }
                 HorizontalLayout {
                     alignment: start;

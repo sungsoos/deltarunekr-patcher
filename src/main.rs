@@ -1,3 +1,5 @@
+#![windows_subsystem = "windows"]
+
 use std::borrow::Cow;
 use std::collections::HashMap;
 use std::fs::{self, File};
@@ -12,6 +14,7 @@ use std::time::Duration;
 use flate2::read::GzDecoder;
 use ini::Ini;
 use serde_json::Value;
+use slint::winit_030::WinitWindowAccessor;
 use slint::{Color, Model, ModelRc, SharedString, VecModel};
 
 slint::include_modules!();
@@ -292,18 +295,35 @@ fn is_libraryfolders_vdf(vdf_path: &Path) -> Vec<PathBuf> {
     paths
 }
 
+fn clean_path(path: &Path) -> PathBuf {
+    let s = path.to_string_lossy();
+    if let Some(stripped) = s.strip_prefix(r"\\?\UNC\") {
+        PathBuf::from(format!(r"\\{}", stripped))
+    } else if let Some(stripped) = s.strip_prefix(r"\\?\") {
+        PathBuf::from(stripped)
+    } else {
+        path.to_path_buf()
+    }
+}
+
+fn canonicalize_clean(path: &Path) -> std::io::Result<PathBuf> {
+    let p = fs::canonicalize(path)?;
+    Ok(clean_path(&p))
+}
+
 fn resolve_game_folder(dir: &Path) -> PathBuf {
+    let cleaned = clean_path(dir);
     if cfg!(target_os = "macos") {
-        let cand_app_resources = dir.join("DELTARUNE.app").join("Contents").join("Resources");
+        let cand_app_resources = cleaned.join("DELTARUNE.app").join("Contents").join("Resources");
         if cand_app_resources.exists() {
             return cand_app_resources;
         }
-        let cand_resources = dir.join("Contents").join("Resources");
+        let cand_resources = cleaned.join("Contents").join("Resources");
         if cand_resources.exists() {
             return cand_resources;
         }
     }
-    dir.to_path_buf()
+    cleaned
 }
 
 fn find_launcher_data_file(target_dir: &Path, is_mac: bool) -> Option<PathBuf> {
@@ -478,12 +498,13 @@ fn detect_deltarune() -> Option<PathBuf> {
     let mut steam_libraries: Vec<PathBuf> = Vec::new();
     for s_dir in candidate_steam_dirs {
         if s_dir.exists() {
-            if let Ok(real_dir) = fs::canonicalize(&s_dir) {
+            if let Ok(real_dir) = canonicalize_clean(&s_dir) {
                 if !steam_libraries.contains(&real_dir) {
                     steam_libraries.push(real_dir.clone());
                 }
                 let vdf = real_dir.join("steamapps").join("libraryfolders.vdf");
                 for parsed in is_libraryfolders_vdf(&vdf) {
+                    let parsed = clean_path(&parsed);
                     if !steam_libraries.contains(&parsed) {
                         steam_libraries.push(parsed);
                     }
@@ -495,11 +516,11 @@ fn detect_deltarune() -> Option<PathBuf> {
     for lib in steam_libraries {
         for folder_name in ["DELTARUNE", "Deltarune", "deltarune"] {
             let common_path = lib.join("steamapps").join("common").join(folder_name);
-            if let Ok(real_path) = fs::canonicalize(&common_path) {
+            if let Ok(real_path) = canonicalize_clean(&common_path) {
                 let resolved = resolve_game_folder(&real_path);
                 let (valid, _) = validate_deltarune_folder(&resolved);
                 if valid {
-                    return Some(resolved);
+                    return Some(clean_path(&resolved));
                 }
             }
         }
@@ -510,6 +531,11 @@ fn detect_deltarune() -> Option<PathBuf> {
 
 fn redact_user_path(path_str: &str) -> String {
     let mut s = path_str.to_string();
+    if let Some(stripped) = s.strip_prefix(r"\\?\UNC\") {
+        s = format!(r"\\{}", stripped);
+    } else if let Some(stripped) = s.strip_prefix(r"\\?\") {
+        s = stripped.to_string();
+    }
     if let Some(home) = dirs::home_dir() {
         if let Some(home_str) = home.to_str() {
             s = s.replace(home_str, "~");
@@ -559,89 +585,146 @@ fn get_xdelta3_binary() -> Option<PathBuf> {
     None
 }
 
-fn patchit(target_file: &Path, delta_bytes: &[u8], delta_name: &str) -> Result<(), String> {
+struct PatchError {
+    detail: String,
+    summary: String,
+}
+
+fn patchit(target_file: &Path, delta_bytes: &[u8], delta_name: &str) -> Result<(), PatchError> {
+    let target_file = clean_path(target_file);
     let clean_target = redact_user_path(&target_file.to_string_lossy());
 
     if !target_file.exists() {
-        return Err(format!("패치할 파일이 존재하지 않습니다: {}", clean_target));
+        return Err(PatchError {
+            detail: String::new(),
+            summary: format!("패치할 파일이 존재하지 않습니다: {}", clean_target),
+        });
     }
     if delta_bytes.is_empty() {
-        return Err(format!("델타 패치 데이터가 비어있습니다: {}", delta_name));
+        return Err(PatchError {
+            detail: String::new(),
+            summary: format!("델타 패치 데이터가 비어있습니다: {}", delta_name),
+        });
     }
 
-    let target_size = fs::metadata(target_file).map(|m| m.len()).unwrap_or(0);
+    let target_size = fs::metadata(&target_file).map(|m| m.len()).unwrap_or(0);
     if target_size == 0 {
-        return Err(format!("대상 파일이 비어있습니다 (0 byte): {}", clean_target));
+        return Err(PatchError {
+            detail: String::new(),
+            summary: format!("대상 파일이 비어있습니다 (0 byte): {}", clean_target),
+        });
     }
 
-    let tmp_file = target_file.with_extension(format!(
+    let tmp_file = clean_path(&target_file.with_extension(format!(
         "{}.tmp",
         target_file.extension().unwrap_or_default().to_string_lossy()
-    ));
+    )));
 
     if tmp_file.exists() {
         let _ = fs::remove_file(&tmp_file);
     }
 
     let mut patched_ok = false;
+    let mut detail_logs: Vec<String> = Vec::new();
 
     // 1. xdelta3 CLI 시도
     let xdelta3_bin = get_xdelta3_binary();
     if let Some(ref bin) = xdelta3_bin {
-        let delta_tmp = std::env::temp_dir().join(format!("xdelta_tmp_{}", delta_name));
-        if fs::write(&delta_tmp, delta_bytes).is_ok() {
-            let output = StdCommand::new(bin)
-                .args([
-                    "-d",
-                    "-f",
-                    "-s",
-                    target_file.to_str().unwrap_or_default(),
-                    delta_tmp.to_str().unwrap_or_default(),
-                    tmp_file.to_str().unwrap_or_default(),
-                ])
-                .output();
-            let _ = fs::remove_file(&delta_tmp);
+        let delta_tmp = clean_path(&std::env::temp_dir().join(format!(
+            "xdelta_tmp_{}_{}",
+            delta_name,
+            std::process::id()
+        )));
+        match fs::write(&delta_tmp, delta_bytes) {
+            Ok(_) => {
+                let cmd_result = StdCommand::new(bin)
+                    .args([
+                        "-d",
+                        "-f",
+                        "-s",
+                        target_file.to_str().unwrap_or_default(),
+                        delta_tmp.to_str().unwrap_or_default(),
+                        tmp_file.to_str().unwrap_or_default(),
+                    ])
+                    .output();
+                let _ = fs::remove_file(&delta_tmp);
 
-            if let Ok(out) = output {
-                if out.status.success()
-                    && tmp_file.exists()
-                    && fs::metadata(&tmp_file).map(|m| m.len()).unwrap_or(0) > 0
-                {
-                    patched_ok = true;
+                match cmd_result {
+                    Ok(out) => {
+                        let stdout = String::from_utf8_lossy(&out.stdout).trim().to_string();
+                        let stderr = String::from_utf8_lossy(&out.stderr).trim().to_string();
+                        if out.status.success()
+                            && tmp_file.exists()
+                            && fs::metadata(&tmp_file).map(|m| m.len()).unwrap_or(0) > 0
+                        {
+                            patched_ok = true;
+                        } else {
+                            let mut xdelta_err = format!("xdelta3 실행 종료 코드: {:?}", out.status.code());
+                            if !stderr.is_empty() {
+                                xdelta_err.push_str(&format!("\nxdelta3 stderr: {}", stderr));
+                            }
+                            if !stdout.is_empty() {
+                                xdelta_err.push_str(&format!("\nxdelta3 stdout: {}", stdout));
+                            }
+                            detail_logs.push(xdelta_err);
+                        }
+                    }
+                    Err(e) => {
+                        detail_logs.push(format!("xdelta3 프로세스 실행 실패: {}", e));
+                    }
                 }
             }
+            Err(e) => {
+                detail_logs.push(format!("임시 패치 파일 쓰기 실패: {}", e));
+            }
         }
+    } else {
+        detail_logs.push("xdelta3 실행 바이너리를 찾을 수 없어 내장 디코더로 진행합니다.".to_string());
     }
 
     // 2. 내장 vcdiff-decoder 사용 (메모리에서 바로 디코딩)
     if !patched_ok {
-        let res = std::panic::catch_unwind(|| {
-            if let Ok(target_bytes) = fs::read(target_file) {
+        match fs::read(&target_file) {
+            Ok(target_bytes) => {
                 let mut delta_cursor = std::io::Cursor::new(delta_bytes);
                 let mut patch_cursor = std::io::Cursor::new(target_bytes.as_slice());
                 let mut out_buf = Vec::new();
 
-                if vcdiff_decoder::apply_patch(&mut delta_cursor, Some(&mut patch_cursor), &mut out_buf).is_ok() {
-                    if fs::write(&tmp_file, out_buf).is_ok()
-                        && tmp_file.exists()
-                        && fs::metadata(&tmp_file).map(|m| m.len()).unwrap_or(0) > 0
-                    {
-                        return true;
+                match vcdiff_decoder::apply_patch(&mut delta_cursor, Some(&mut patch_cursor), &mut out_buf) {
+                    Ok(_) => {
+                        if let Err(e) = fs::write(&tmp_file, &out_buf) {
+                            detail_logs.push(format!("내장 디코더 출력 파일 쓰기 실패: {}", e));
+                        } else if tmp_file.exists() && fs::metadata(&tmp_file).map(|m| m.len()).unwrap_or(0) > 0 {
+                            patched_ok = true;
+                        } else {
+                            detail_logs.push("내장 디코더 출력 파일이 비어 있습니다.".to_string());
+                        }
+                    }
+                    Err(e) => {
+                        detail_logs.push(format!("내장 vcdiff 디코더 오류: {:?}", e));
                     }
                 }
             }
-            false
-        });
-        if let Ok(true) = res {
-            patched_ok = true;
+            Err(e) => {
+                detail_logs.push(format!("원본 파일 읽기 실패 ({:?}): {}", target_file, e));
+            }
         }
     }
 
     if !patched_ok || !tmp_file.exists() {
-        return Err("이미 패치되었거나 원본 파일 버전이 일치하지 않습니다.".to_string());
+        return Err(PatchError {
+            detail: detail_logs.join("\n"),
+            summary: "이미 패치되었거나 원본 파일 버전이 일치하지 않습니다.".to_string(),
+        });
     }
 
-    fs::copy(&tmp_file, target_file).map_err(|e| e.to_string())?;
+    if let Err(e) = fs::copy(&tmp_file, &target_file) {
+        let _ = fs::remove_file(&tmp_file);
+        return Err(PatchError {
+            detail: format!("패치 임시 파일 복사 실패: {}", e),
+            summary: format!("패치 파일 복사 실패 ({})", e),
+        });
+    }
     let _ = fs::remove_file(&tmp_file);
 
     Ok(())
@@ -944,16 +1027,23 @@ fn parse_hex_color(hex: &str) -> Color {
 }
 
 fn main() -> Result<(), slint::PlatformError> {
+    let _ = slint::BackendSelector::new()
+        .with_winit_window_attributes_hook(|attributes| attributes.with_decorations(false))
+        .select();
+
     let main_window = MainWindow::new()?;
+    main_window.window().with_winit_window(|winit_window| {
+        winit_window.set_decorations(false);
+    });
 
     let logs_model = Rc::new(VecModel::<LogItem>::default());
     main_window.set_logs(ModelRc::from(logs_model.clone()));
-
 
     let mut initial_log = String::new();
     let selected_folder = Arc::new(Mutex::new(Option::<PathBuf>::None));
 
     if let Some(auto_path) = detect_deltarune() {
+        let auto_path = clean_path(&auto_path);
         let path_str = auto_path.to_string_lossy().to_string();
         *selected_folder.lock().unwrap() = Some(auto_path);
         main_window.set_folder_path(SharedString::from(format!(
@@ -1087,9 +1177,8 @@ fn main() -> Result<(), slint::PlatformError> {
     let window_weak = main_window.as_weak();
     main_window.on_drag_window(move || {
         if let Some(window) = window_weak.upgrade() {
-            let _ = window.window().dispatch_event(slint::platform::WindowEvent::PointerPressed {
-                position: slint::LogicalPosition::new(0.0, 0.0),
-                button: slint::platform::PointerEventButton::Left,
+            window.window().with_winit_window(|winit_window| {
+                let _ = winit_window.drag_window();
             });
         }
     });
@@ -1185,14 +1274,30 @@ fn main() -> Result<(), slint::PlatformError> {
                 log_cb("--- 패치 작업 시작 ---".to_string(), "#FFFF00");
 
                 let error_window_weak = window_weak_thread.clone();
-                let on_error = |err_msg: String| {
-                    log_cb(err_msg, "#FF5555");
+                let on_error_detailed = |detail: String, summary: String| {
+                    if !detail.trim().is_empty() {
+                        for line in detail.lines() {
+                            if !line.trim().is_empty() {
+                                log_cb(line.to_string(), "#FF5555");
+                            }
+                        }
+                        log_cb("------------------------".to_string(), "#888888");
+                    }
+                    let summary_line = if summary.starts_with('*') {
+                        summary
+                    } else {
+                        format!("* 오류: {}", summary)
+                    };
+                    log_cb(summary_line, "#FF5555");
                     let error_window_weak = error_window_weak.clone();
                     let _ = slint::invoke_from_event_loop(move || {
                         if let Some(w) = error_window_weak.upgrade() {
                             w.set_patch_enabled(true);
                         }
                     });
+                };
+                let on_error = |summary: String| {
+                    on_error_detailed(String::new(), summary);
                 };
 
                 if !folder.exists() {
@@ -1272,7 +1377,7 @@ fn main() -> Result<(), slint::PlatformError> {
                     if let Some(ref delta) = launcher_delta {
                         log_cb("--- 런처 패치 적용 중 ---".to_string(), "#FFFF00");
                         if let Err(e) = patchit(&target, delta, "launcher.xdelta") {
-                            on_error(format!("* 오류: {}", e));
+                            on_error_detailed(e.detail, e.summary);
                             return;
                         }
                         log_cb("* 런처 패치 완료!".to_string(), "#00FF00");
@@ -1285,7 +1390,7 @@ fn main() -> Result<(), slint::PlatformError> {
                         "#FFFF00",
                     );
                     if let Err(e) = patchit(target_file, delta, &format!("ch{}.xdelta", ch_num)) {
-                        on_error(format!("* 오류: {}", e));
+                        on_error_detailed(e.detail, e.summary);
                         return;
                     }
                     log_cb(format!("* 챕터 {} 패치 완료!", ch_num), "#00FF00");
@@ -1339,6 +1444,9 @@ fn main() -> Result<(), slint::PlatformError> {
                         window.set_patch_enabled(true);
 
                         if let Ok(dialog) = PatchFinishedWindow::new() {
+                            dialog.window().with_winit_window(|winit_window| {
+                                winit_window.set_decorations(false);
+                            });
                             let dialog_weak = dialog.as_weak();
                             dialog.on_launch_steam(move || {
                                 let _ = open::that("steam://rungameid/1671210");

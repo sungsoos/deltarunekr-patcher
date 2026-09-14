@@ -79,12 +79,12 @@ chmod +x build.sh
 ```
 - 빌드 결과물: `dist/Linux-Patcher-bin`
 
-### macOS (`.app` 번들 빌드)
+### macOS (단일 바이너리 빌드)
 ```bash
 chmod +x build.sh
-./build_all.sh
+./build.sh
 ```
-- 빌드 결과물: `dist/MacOS-Patcher.app`
+- 빌드 결과물: `dist/MacOS-Patcher-arm64` (Apple Silicon) 또는 `dist/MacOS-Patcher-x86_64` (Intel)
 
 ### 직접 cargo로 빌드 (모든 플랫폼)
 ```bash
@@ -113,6 +113,9 @@ deltarunekr_patcher/
 ├── build.sh          # Linux / macOS 빌드 스크립트
 └── README.md
 ```
+
+## 스크린샷
+![EndeavourOS](/images/linux.png)
 
 ## 📜 라이선스 및 참고 사항 (Notice)
 - 델타돋움체: qhtjr1116 제작, 링크: [https://eocnd1116.github.io/qhtjrFont/index.html?type=1&n=0](https://eocnd1116.github.io/qhtjrFont/index.html?type=1&n=0)

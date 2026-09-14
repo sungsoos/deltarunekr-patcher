@@ -5,8 +5,16 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DIST_DIR="${SCRIPT_DIR}/dist"
 RELEASE_DIR="${SCRIPT_DIR}/target/release"
 
+TARGET="${1:-}"
+
 echo "=== cargo로 빌드 중... ==="
-cargo build --release
+if [ -n "${TARGET}" ]; then
+    cargo build --release --target "${TARGET}"
+    RELEASE_DIR="${SCRIPT_DIR}/target/${TARGET}/release"
+else
+    cargo build --release
+    RELEASE_DIR="${SCRIPT_DIR}/target/release"
+fi
 
 rm -rf "${DIST_DIR}"
 mkdir -p "${DIST_DIR}"
@@ -23,43 +31,24 @@ case "${OS_NAME}" in
 
     Darwin*)
         echo "=== 바이너리 복사 중 ==="
-        cp "${RELEASE_DIR}/deltarunekr_patcher" "${DIST_DIR}/MacOS-Patcher-bin"
-        chmod +x "${DIST_DIR}/MacOS-Patcher-bin"
-        echo "[+] macOS 단일 바이너리 생성됨: ${DIST_DIR}/MacOS-Patcher-bin"
-
-        echo "=== .app 번들 생성 중 ==="
-        APP_BUNDLE="${DIST_DIR}/MacOS-Patcher.app"
-        mkdir -p "${APP_BUNDLE}/Contents/MacOS"
-        mkdir -p "${APP_BUNDLE}/Contents/Resources"
-
-        cp "${RELEASE_DIR}/deltarunekr_patcher" "${APP_BUNDLE}/Contents/MacOS/"
-        chmod +x "${APP_BUNDLE}/Contents/MacOS/deltarunekr_patcher"
-
-        if [ -f "${SCRIPT_DIR}/assets/icon.icns" ]; then
-            cp "${SCRIPT_DIR}/assets/icon.icns" "${APP_BUNDLE}/Contents/Resources/AppIcon.icns"
-        fi
-
-        cat <<EOF > "${APP_BUNDLE}/Contents/Info.plist"
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-    <key>CFBundleExecutable</key>
-    <string>deltarunekr_patcher</string>
-    <key>CFBundleIconFile</key>
-    <string>AppIcon</string>
-    <key>CFBundleIdentifier</key>
-    <string>kr.deltarune.patcher</string>
-    <key>CFBundleName</key>
-    <string>델타룬 한국어 패처</string>
-    <key>CFBundlePackageType</key>
-    <string>APPL</string>
-    <key>CFBundleShortVersionString</key>
-    <string>0.1.0</string>
-</dict>
-</plist>
-EOF
-        echo "[+] macOS .app 번들 생성됨: ${APP_BUNDLE}"
+        case "${TARGET}" in
+            x86_64*)
+                BIN_NAME="MacOS-Patcher-x86_64"
+                ;;
+            aarch64*|arm64*)
+                BIN_NAME="MacOS-Patcher-arm64"
+                ;;
+            *)
+                case "$(uname -m)" in
+                    x86_64) BIN_NAME="MacOS-Patcher-x86_64" ;;
+                    arm64)  BIN_NAME="MacOS-Patcher-arm64" ;;
+                    *)      BIN_NAME="MacOS-Patcher-bin" ;;
+                esac
+                ;;
+        esac
+        cp "${RELEASE_DIR}/deltarunekr_patcher" "${DIST_DIR}/${BIN_NAME}"
+        chmod +x "${DIST_DIR}/${BIN_NAME}"
+        echo "[+] macOS 단일 바이너리 생성됨: ${DIST_DIR}/${BIN_NAME}"
         ;;
 
     *)
